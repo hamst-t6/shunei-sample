@@ -191,14 +191,25 @@
   .q-timer-sec { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; min-height: 1em; font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
 
   .mic-area { margin-top: 14px; }
-  .mic-btn {
-    display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
-    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-primary);
-    border-radius: 12px; padding: 13px 16px; font-size: 0.95rem; font-weight: 600; cursor: pointer; font-family: inherit;
+  .mic-status {
+    display: none; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--critical);
+    font-weight: 600; margin-bottom: 8px;
   }
-  .mic-btn.listening { border-color: var(--critical); color: var(--critical); }
-  .mic-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .mic-live { margin-top: 10px; font-size: 0.98rem; color: var(--text-secondary); min-height: 1.3em; font-style: italic; word-break: break-word; }
+  .mic-status.show { display: flex; }
+  .mic-status .dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--critical);
+    animation: micpulse 1s ease-in-out infinite;
+  }
+  @keyframes micpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  .mic-live {
+    font-size: 1.05rem; color: var(--text-primary); min-height: 1.4em;
+    word-break: break-word; background: var(--surface-2); border-radius: 10px; padding: 10px 12px;
+  }
+  .mic-live:empty::before { content: "（ここに聞き取り結果が出ます）"; color: var(--text-muted); font-style: italic; }
+  .mic-controls { display: flex; gap: 8px; margin-top: 10px; }
+  .mic-controls .btn { flex: 1; padding: 13px 8px; font-size: 0.9rem; }
+  .mic-btn-redo { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); }
+  .btn-next { margin-top: 16px; }
 
   .answer-box { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gridline); display: none; }
   .answer-box.show { display: block; }
@@ -370,19 +381,31 @@
         </div>
 
         <div class="opt-group">
-          <span class="opt-label">解答の制限時間（読み上げ後のカウントダウン）</span>
+          <div class="toggle-row">
+            <div>
+              <div class="tr-label">採点したら「次へ」ボタンで進む</div>
+              <div class="tr-hint">オフにすると採点後すぐ次の問題へ</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="tglManualNext" checked><span class="track"></span></label>
+          </div>
+        </div>
+
+        <div class="opt-group">
+          <span class="opt-label">解答の目安タイマー（読み上げ後のカウントダウン）</span>
           <div class="seg" id="segLimit">
+            <button data-val="off">なし</button>
             <button data-val="easy">イージー 15秒</button>
             <button data-val="normal" class="active">ふつう 10秒</button>
             <button data-val="hard">ハード 6秒</button>
           </div>
+          <div class="tr-hint" style="margin-top:6px">音声入力では時間が来ても自動送信しません。「解答する」を押すまで聞き取りを続けます。</div>
         </div>
 
         <div class="opt-group" id="micGroup">
           <div class="toggle-row">
             <div>
               <div class="tr-label">音声入力で答える</div>
-              <div class="tr-hint" id="micHint">話した英語を認識し、単語ごとに正誤を色分け表示</div>
+              <div class="tr-hint" id="micHint">「解答する」を押すまで聞き取りを続け、単語ごとに正誤を色分け表示</div>
             </div>
             <label class="switch"><input type="checkbox" id="tglMic"><span class="track"></span></label>
           </div>
@@ -409,7 +432,7 @@
       </div>
 
       <button class="btn btn-primary btn-block btn-lg" id="btnStart">練習をはじめる</button>
-      <div class="kbd-hint">PCなら Space＝答えを見る ／ 3＝◎完璧　2＝○通じた　1＝✗ダメ</div>
+      <div class="kbd-hint">PCなら Space＝答えを見る／次へ ／ 3＝◎完璧　2＝○通じた　1＝✗ダメ</div>
     </div>
 
     <div class="view" data-view="session">
@@ -430,8 +453,13 @@
         <div class="q-timer-sec" id="qTimerSec"></div>
 
         <div class="mic-area" id="micArea" style="display:none">
-          <button class="mic-btn" id="micBtn"><span>🎤</span><span id="micBtnLabel">話す</span></button>
+          <div class="mic-status" id="micStatus"><span class="dot"></span><span>聞き取り中</span></div>
           <div class="mic-live" id="micLive"></div>
+          <button class="mic-btn" id="micBtn" style="margin-top:10px"><span>🎤</span><span id="micBtnLabel">話す</span></button>
+          <div class="mic-controls" id="micControls" style="display:none">
+            <button class="btn mic-btn-redo" id="micRedo">↻ 言い直す</button>
+            <button class="btn btn-primary" id="micSubmit">解答する</button>
+          </div>
         </div>
 
         <div class="answer-box" id="answerBox">
@@ -449,11 +477,13 @@
             <div class="wc-line" id="wcSaid"></div>
           </div>
 
-          <div class="judge-row">
+          <div class="judge-row" id="judgeRow">
             <button class="btn btn-ng" id="btnG0">✗ ダメ <span class="k">(1)</span></button>
             <button class="btn btn-mid" id="btnG1">○ 通じた <span class="k">(2)</span></button>
             <button class="btn btn-ok" id="btnG2">◎ 完璧 <span class="k">(3)</span></button>
           </div>
+
+          <button class="btn btn-primary btn-block btn-next" id="btnNext" style="display:none">次へ ▶ <span style="opacity:.6">(Space)</span></button>
         </div>
 
         <button class="btn btn-primary btn-block" id="btnShowAnswer" style="margin-top:16px">答えを見る <span style="opacity:.6">(Space)</span></button>
@@ -727,7 +757,7 @@
   var settings = loadJSON(SETTINGS_KEY, {});
   settings = Object.assign({
     order: "shuffle", count: "20", limit: "normal",
-    readJa: true, autoStart: true, autoGrade: false, mic: false, auto: true, rate: 1,
+    readJa: true, autoStart: true, autoGrade: false, manualNext: true, mic: false, auto: true, rate: 1,
     cats: null
   }, settings);
 
@@ -823,7 +853,7 @@
     u.onend = finish;
     u.onerror = finish;
     window.speechSynthesis.speak(u);
-    setTimeout(finish, Math.max(3500, text.length * 220)); // onend が来ない端末対策
+    setTimeout(finish, Math.max(3500, text.length * 240)); // onend が来ない端末対策
   }
 
   /* ================= 英語の照合（寛容め） ================= */
@@ -1023,6 +1053,7 @@
   }
   bindToggle("tglReadJa", "readJa");
   bindToggle("tglAutoStart", "autoStart");
+  bindToggle("tglManualNext", "manualNext");
   bindToggle("tglAuto", "auto");
 
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1068,11 +1099,12 @@
   /* ---------- セッション ---------- */
   var queue = [], idx = 0, missed = [], nearMiss = [], mode = "practice";
   var cnt = { 0: 0, 1: 0, 2: 0 };
-  var answerShown = false, micSuggestGrade = null;
+  var answerShown = false, micSuggestGrade = null, awaitingNext = false;
   var LIMIT_SEC = { easy: 15, normal: 10, hard: 6 };
   var qTimerRAF = 0, timerActive = false;
 
-  var recog = null, listening = false, finalText = "", lastInterim = "";
+  var recog = null, listening = false, micWantActive = false, micPhase = "idle";
+  var finalText = "", lastInterim = "";
 
   function shuffle(arr) {
     var a = arr.slice();
@@ -1107,7 +1139,7 @@
   }
 
   function renderQuestion() {
-    answerShown = false; micSuggestGrade = null;
+    answerShown = false; micSuggestGrade = null; awaitingNext = false;
     stopMic(); stopTimer();
     var s = queue[idx];
     $("qCatName").textContent = s.catName + (mode === "review" ? " ・復習" : "");
@@ -1118,13 +1150,15 @@
     $("answerBox").classList.remove("show");
     $("wordCheck").style.display = "none";
     $("micLive").textContent = "";
+    $("judgeRow").style.display = "flex";
+    $("btnNext").style.display = "none";
     finalText = ""; lastInterim = "";
     ["btnG0", "btnG1", "btnG2"].forEach(function (id) { $(id).classList.remove("suggested"); });
 
     var micOn = settings.mic && micSupported;
-    $("btnShowAnswer").style.display = "block";
     $("btnShowAnswer").className = "btn btn-block " + (micOn ? "btn-secondary" : "btn-primary");
     $("btnShowAnswer").firstChild.textContent = micOn ? "話さずに答えを見る " : "答えを見る ";
+    setMicPhase("idle");
 
     var pct = Math.round(idx / queue.length * 100);
     $("progFill").style.width = pct + "%";
@@ -1163,25 +1197,28 @@
     })();
   }
   function startThinkTimer() {
-    runTimer(LIMIT_SEC[settings.limit] || 10, "考える時間", function () { showAnswer(); });
+    if (!LIMIT_SEC[settings.limit]) return;
+    runTimer(LIMIT_SEC[settings.limit], "考える時間", function () { showAnswer(); });
   }
 
-  /* --- マイク --- */
-  function resetMicBtn() {
-    listening = false;
-    $("micBtn").classList.remove("listening");
-    $("micBtnLabel").textContent = "話す";
+  /* --- マイク（「解答する」を押すまで聞き取り継続） --- */
+  function setMicPhase(p) {
+    micPhase = p;
+    var micOn = settings.mic && micSupported;
+    var idle = micOn && p === "idle" && !answerShown;
+    var live = micOn && p === "listening" && !answerShown;
+    $("micBtn").style.display = idle ? "flex" : "none";
+    $("micControls").style.display = live ? "flex" : "none";
+    $("micStatus").classList.toggle("show", live);
+    $("btnShowAnswer").style.display = (!answerShown && (!micOn || p === "idle")) ? "block" : "none";
   }
-  function stopMic() {
-    stopTimer();
-    if (recog) { try { recog.stop(); } catch (e) {} }
-    resetMicBtn();
+  function updateLive() {
+    $("micLive").textContent = (finalText + " " + lastInterim).replace(/\s+/g, " ").trim();
   }
-  function startMic() {
-    if (!micSupported || answerShown || listening) return;
+  function beginRecognition() {
+    if (recog) { try { recog.onend = recog.onresult = recog.onerror = null; recog.abort(); } catch (e) {} }
     try { recog = new SR(); } catch (e) { return; }
-    finalText = ""; lastInterim = ""; $("micLive").textContent = "";
-    recog.lang = "en-US"; recog.interimResults = true; recog.continuous = false;
+    recog.lang = "en-US"; recog.interimResults = true; recog.continuous = true;
     recog.onresult = function (e) {
       var interim = "";
       for (var i = e.resultIndex; i < e.results.length; i++) {
@@ -1190,31 +1227,75 @@
         else interim += r[0].transcript;
       }
       lastInterim = interim;
-      $("micLive").textContent = (finalText + interim).trim();
+      updateLive();
     };
     recog.onerror = function (ev) {
-      stopTimer(); resetMicBtn();
-      if (ev.error === "not-allowed" || ev.error === "service-not-allowed")
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+        micWantActive = false; stopTimer(); listening = false; setMicPhase("idle");
         $("micLive").textContent = "マイクの使用が許可されていません。ブラウザの設定で許可してください。";
-      else if (ev.error === "no-speech")
-        $("micLive").textContent = "声が聞き取れませんでした。";
+      }
+      // no-speech / aborted / network などは onend 側で自動再開を試みる
     };
     recog.onend = function () {
-      stopTimer(); resetMicBtn();
-      var said = (finalText + " " + lastInterim).trim();
-      showAnswer();
-      if (said) { $("micLive").textContent = said; renderWordCheck(said); }
-      else if (!$("micLive").textContent) $("qNote").textContent = "（音声を認識できませんでした）";
+      if (micWantActive && !answerShown) {
+        setTimeout(function () { if (micWantActive && !answerShown) beginRecognition(); }, 250);
+        return;
+      }
+      listening = false;
     };
-    try {
-      recog.start();
-      listening = true;
-      $("micBtn").classList.add("listening");
-      $("micBtnLabel").textContent = "聞き取り中… (押して停止)";
-      runTimer(LIMIT_SEC[settings.limit] || 10, "話す時間", function () { stopMic(); });
-    } catch (e) { stopTimer(); resetMicBtn(); }
+    try { recog.start(); } catch (e) {}
   }
-  $("micBtn").addEventListener("click", function () { if (listening) stopMic(); else startMic(); });
+  function armTimer() {
+    if (!LIMIT_SEC[settings.limit]) return;
+    runTimer(LIMIT_SEC[settings.limit], "話す時間の目安（自動送信はしません）", function () {
+      $("qTimer").classList.add("show");
+      $("qTimerFill").style.width = "100%";
+      $("qTimerFill").className = "q-timer-fill danger";
+      $("qTimerSec").innerHTML = "<span>⏰ 時間の目安を過ぎました</span><span>言い終わったら「解答する」</span>";
+    });
+  }
+  function startMic() {
+    if (!micSupported || answerShown || listening) return;
+    finalText = ""; lastInterim = ""; updateLive();
+    micWantActive = true; listening = true;
+    setMicPhase("listening");
+    beginRecognition();
+    armTimer();
+  }
+  function redoSpeech() {
+    micWantActive = false;
+    if (recog) { try { recog.abort(); } catch (e) {} try { recog.stop(); } catch (e) {} }
+    stopTimer();
+    finalText = ""; lastInterim = ""; updateLive();
+    setTimeout(function () {
+      if (answerShown) return;
+      finalText = ""; lastInterim = "";
+      micWantActive = true; listening = true;
+      setMicPhase("listening");
+      beginRecognition();
+      armTimer();
+    }, 260);
+  }
+  function submitSpeech() {
+    if (answerShown) return;
+    micWantActive = false;
+    if (recog) { try { recog.stop(); } catch (e) {} }
+    stopTimer();
+    var said = (finalText + " " + lastInterim).replace(/\s+/g, " ").trim();
+    showAnswer();
+    if (said) { $("micLive").textContent = said; renderWordCheck(said); }
+    else $("qNote").textContent = "（音声が認識されませんでした。「言い直す」でもう一度どうぞ）";
+  }
+  function stopMic() {
+    micWantActive = false;
+    stopTimer();
+    if (recog) { try { recog.abort(); } catch (e) {} try { recog.stop(); } catch (e) {} }
+    listening = false;
+    if (!answerShown) setMicPhase("idle");
+  }
+  $("micBtn").addEventListener("click", startMic);
+  $("micRedo").addEventListener("click", redoSpeech);
+  $("micSubmit").addEventListener("click", submitSpeech);
 
   function renderWordCheck(said) {
     var s = queue[idx];
@@ -1247,20 +1328,25 @@
     var btn = ["btnG0", "btnG1", "btnG2"][r.grade];
     $(btn).classList.add("suggested");
 
-    if (settings.autoGrade) setTimeout(function () { if (answerShown && queue[idx] === s) judge(r.grade); }, 1700);
+    if (settings.autoGrade) setTimeout(function () {
+      if (answerShown && !awaitingNext && queue[idx] === s) judge(r.grade);
+    }, 1800);
   }
 
   function showAnswer() {
     if (answerShown) return;
     answerShown = true;
     stopMic();
-    $("answerBox").classList.add("show");
+    $("micStatus").classList.remove("show");
+    $("micBtn").style.display = "none";
+    $("micControls").style.display = "none";
     $("btnShowAnswer").style.display = "none";
+    $("answerBox").classList.add("show");
     if (settings.auto) speak(queue[idx].en);
   }
 
-  function judge(g) {
-    if (!answerShown) return;
+  function judge(g, forceAdvance) {
+    if (!answerShown || awaitingNext) return;
     var s = queue[idx];
     attempts.push({ d: todayKey(), c: s.catId, g: g });
     saveAttempts();
@@ -1273,6 +1359,19 @@
       var ri = review.indexOf(s.id);
       if (ri !== -1) { review.splice(ri, 1); saveReview(); }
     }
+    $("progScore").textContent = "◎" + cnt[2] + " ○" + cnt[1] + " ✗" + cnt[0];
+
+    if (settings.manualNext && !forceAdvance) {
+      awaitingNext = true;
+      $("judgeRow").style.display = "none";
+      $("btnNext").style.display = "block";
+      $("btnNext").firstChild.textContent = (idx + 1 >= queue.length) ? "結果を見る " : "次へ ▶ ";
+    } else {
+      advance();
+    }
+  }
+  function advance() {
+    awaitingNext = false;
     idx++;
     if (idx >= queue.length) finishSession();
     else renderQuestion();
@@ -1315,6 +1414,7 @@
   $("btnG0").addEventListener("click", function () { judge(0); });
   $("btnG1").addEventListener("click", function () { judge(1); });
   $("btnG2").addEventListener("click", function () { judge(2); });
+  $("btnNext").addEventListener("click", function () { if (awaitingNext) advance(); });
   $("btnQuit").addEventListener("click", function () {
     if (!confirm("練習を中断して設定に戻りますか？（ここまでの記録は保存されています）")) return;
     window.speechSynthesis && window.speechSynthesis.cancel();
@@ -1331,10 +1431,17 @@
   document.addEventListener("keydown", function (e) {
     if (!document.querySelector('.view[data-view="session"]').classList.contains("active")) return;
     if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
-    if (e.code === "Space") { e.preventDefault(); if (!answerShown) showAnswer(); }
-    else if (e.key === "1" && answerShown) judge(0);
-    else if (e.key === "2" && answerShown) judge(1);
-    else if (e.key === "3" && answerShown) judge(2);
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (awaitingNext) advance();
+      else if (!answerShown) {
+        if (micPhase === "listening") submitSpeech();
+        else showAnswer();
+      }
+    }
+    else if (!awaitingNext && answerShown && e.key === "1") judge(0);
+    else if (!awaitingNext && answerShown && e.key === "2") judge(1);
+    else if (!awaitingNext && answerShown && e.key === "3") judge(2);
   });
 
   /* ================= 統計 ================= */
