@@ -1104,7 +1104,7 @@
   var qTimerRAF = 0, timerActive = false;
 
   var recog = null, listening = false, micWantActive = false, micPhase = "idle";
-  var finalText = "", lastInterim = "";
+  var committed = "", sessionFinal = "", sessionInterim = "", restartCount = 0, emptyStreak = 0;
 
   function shuffle(arr) {
     var a = arr.slice();
@@ -1152,7 +1152,7 @@
     $("micLive").textContent = "";
     $("judgeRow").style.display = "flex";
     $("btnNext").style.display = "none";
-    finalText = ""; lastInterim = "";
+    committed = ""; sessionFinal = ""; sessionInterim = ""; restartCount = 0;
     ["btnG0", "btnG1", "btnG2"].forEach(function (id) { $(id).classList.remove("suggested"); });
 
     var micOn = settings.mic && micSupported;
@@ -1212,38 +1212,109 @@
     $("micStatus").classList.toggle("show", live);
     $("btnShowAnswer").style.display = (!answerShown && (!micOn || p === "idle")) ? "block" : "none";
   }
-  function updateLive() {
-    $("micLive").textContent = (finalText + " " + lastInterim).replace(/\s+/g, " ").trim();
+  /* --- 認識テキストの組み立て（スマホの重複認識対策） --- */
+  function normSpace(s) { return String(s).replace(/\s+/g, " ").trim(); }
+  function wordKey(w) { return w.toLowerCase().replace(/[^a-z0-9']/g, ""); }
+  // 直前と同じ語の連続、末尾で繰り返されたフレーズを取り除く
+  function dedupeWords(s) {
+    var w = normSpace(s).split(" ").filter(Boolean), out = [];
+    for (var i = 0; i < w.length; i++) {
+      var ki = wordKey(w[i]);
+      if (ki && out.length && wordKey(out[out.length - 1]) === ki) continue; // 直前と同じ語
+      out.push(w[i]);
+    }
+    // 末尾で n 語のフレーズが繰り返されていたら 1 回分に畳む（キー比較）
+    var keyOf = function (arr, a, b) {
+      return arr.slice(a, b).map(wordKey).join(" ");
+    };
+    for (var n = Math.floor(out.length / 2); n >= 1; n--) {
+      while (out.length >= 2 * n &&
+        keyOf(out, out.length - n, out.length) === keyOf(out, out.length - 2 * n, out.length - n)) {
+        out = out.slice(0, out.length - n);
+      }
+    }
+    return out.join(" ");
   }
+  // a の末尾と b の先頭が重なっていれば b の重複分を落として連結
+  function mergeDedupe(a, b) {
+    a = normSpace(a); b = normSpace(b);
+    if (!a) return b;
+    if (!b) return a;
+    var aw = a.split(" "), bw = b.split(" ");
+    var ak = aw.map(wordKey), bk = bw.map(wordKey);
+    var maxOv = Math.min(aw.length, bw.length, 10), ov = 0;
+    for (var k = maxOv; k >= 1; k--) {
+      if (ak.slice(ak.length - k).join(" ") === bk.slice(0, k).join(" ")) { ov = k; break; }
+    }
+    return aw.concat(bw.slice(ov)).join(" ");
+  }
+  function liveDisplay() { return dedupeWords(normSpace(committed + " " + sessionFinal + " " + sessionInterim)); }
+  function bestSaid() {
+    var t = normSpace(committed + " " + sessionFinal);
+    if (!t) t = normSpace(committed + " " + sessionFinal + " " + sessionInterim);
+    return dedupeWords(t);
+  }
+  function commitSession() {
+    var seg = normSpace(sessionFinal || sessionInterim);
+    sessionFinal = ""; sessionInterim = "";
+    if (seg) committed = mergeDedupe(committed, seg);
+  }
+  function updateLive() { $("micLive").textContent = liveDisplay(); }
+
   function beginRecognition() {
     if (recog) { try { recog.onend = recog.onresult = recog.onerror = null; recog.abort(); } catch (e) {} }
     try { recog = new SR(); } catch (e) { return; }
-    recog.lang = "en-US"; recog.interimResults = true; recog.continuous = true;
+    recog.lang = "en-US";
+    recog.interimResults = true;
+    recog.continuous = false; // スマホでは continuous=true が重複・誤認識の原因になるため単発認識にする
+    recog.maxAlternatives = 1;
     recog.onresult = function (e) {
-      var interim = "";
-      for (var i = e.resultIndex; i < e.results.length; i++) {
-        var r = e.results[i];
-        if (r.isFinal) finalText += r[0].transcript + " ";
-        else interim += r[0].transcript;
+      // 累積せず、毎回 results 全体から作り直す（重複イベント対策）
+      var fin = "", inter = "";
+      for (var i = 0; i < e.results.length; i++) {
+        var res = e.results[i];
+        if (res.isFinal) fin += res[0].transcript + " ";
+        else inter += res[0].transcript + " ";
       }
-      lastInterim = interim;
+      sessionFinal = normSpace(fin);
+      sessionInterim = normSpace(inter);
       updateLive();
     };
     recog.onerror = function (ev) {
       if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
         micWantActive = false; stopTimer(); listening = false; setMicPhase("idle");
         $("micLive").textContent = "マイクの使用が許可されていません。ブラウザの設定で許可してください。";
+      } else if (ev.error === "network") {
+        micWantActive = false; listening = false;
+        $("micLive").textContent = "音声認識に接続できません（通信状況を確認してください）。";
       }
-      // no-speech / aborted / network などは onend 側で自動再開を試みる
+      // no-speech / aborted は onend 側で処理
     };
     recog.onend = function () {
-      if (micWantActive && !answerShown) {
-        setTimeout(function () { if (micWantActive && !answerShown) beginRecognition(); }, 250);
-        return;
+      var before = committed;
+      commitSession();
+      $("micLive").textContent = dedupeWords(normSpace(committed));
+      emptyStreak = (committed === before) ? emptyStreak + 1 : 0;
+      var stop = answerShown || !micWantActive || !listening || restartCount >= 25 || (committed && emptyStreak >= 2);
+      if (!stop) {
+        restartCount++;
+        setTimeout(function () {
+          if (micWantActive && !answerShown && listening) beginRecognition();
+        }, 350);
+      } else {
+        listening = false;
+        if (committed && !answerShown) micReadyHint();
       }
-      listening = false;
     };
     try { recog.start(); } catch (e) {}
+  }
+  function micReadyHint() {
+    $("micStatus").innerHTML = '<span>✅ 認識できました</span><span style="color:var(--text-muted);font-weight:400">「解答する」を押す ／ 言い直すことも可</span>';
+    $("micStatus").style.color = "var(--success)";
+  }
+  function micListeningHint() {
+    $("micStatus").innerHTML = '<span class="dot"></span><span>聞き取り中</span>';
+    $("micStatus").style.color = "var(--critical)";
   }
   function armTimer() {
     if (!LIMIT_SEC[settings.limit]) return;
@@ -1256,41 +1327,46 @@
   }
   function startMic() {
     if (!micSupported || answerShown || listening) return;
-    finalText = ""; lastInterim = ""; updateLive();
+    committed = ""; sessionFinal = ""; sessionInterim = ""; restartCount = 0; emptyStreak = 0;
+    updateLive();
     micWantActive = true; listening = true;
     setMicPhase("listening");
+    micListeningHint();
     beginRecognition();
     armTimer();
   }
   function redoSpeech() {
-    micWantActive = false;
+    micWantActive = false; listening = false;
     if (recog) { try { recog.abort(); } catch (e) {} try { recog.stop(); } catch (e) {} }
     stopTimer();
-    finalText = ""; lastInterim = ""; updateLive();
+    committed = ""; sessionFinal = ""; sessionInterim = ""; restartCount = 0; emptyStreak = 0;
+    updateLive();
     setTimeout(function () {
       if (answerShown) return;
-      finalText = ""; lastInterim = "";
+      committed = ""; sessionFinal = ""; sessionInterim = ""; restartCount = 0; emptyStreak = 0;
       micWantActive = true; listening = true;
       setMicPhase("listening");
+      micListeningHint();
       beginRecognition();
       armTimer();
-    }, 260);
+    }, 300);
   }
   function submitSpeech() {
     if (answerShown) return;
-    micWantActive = false;
-    if (recog) { try { recog.stop(); } catch (e) {} }
+    micWantActive = false; listening = false;
+    if (recog) { try { recog.stop(); } catch (e) {} try { recog.abort(); } catch (e) {} }
     stopTimer();
-    var said = (finalText + " " + lastInterim).replace(/\s+/g, " ").trim();
+    commitSession();
+    var said = bestSaid();
     showAnswer();
     if (said) { $("micLive").textContent = said; renderWordCheck(said); }
     else $("qNote").textContent = "（音声が認識されませんでした。「言い直す」でもう一度どうぞ）";
   }
   function stopMic() {
     micWantActive = false;
+    listening = false;
     stopTimer();
     if (recog) { try { recog.abort(); } catch (e) {} try { recog.stop(); } catch (e) {} }
-    listening = false;
     if (!answerShown) setMicPhase("idle");
   }
   $("micBtn").addEventListener("click", startMic);
