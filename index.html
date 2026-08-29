@@ -1287,7 +1287,7 @@
   /* --- 認識テキストの組み立て（スマホの重複認識対策） --- */
   function normSpace(s) { return String(s).replace(/\s+/g, " ").trim(); }
   function wordKey(w) { return w.toLowerCase().replace(/[^a-z0-9']/g, ""); }
-  // 直前と同じ語の連続、末尾で繰り返されたフレーズを取り除く
+  // 直前と同じ語の連続、および「同じ並びがすぐ繰り返されるフレーズ」をどの位置でも 1 回分に畳む
   function dedupeWords(s) {
     var w = normSpace(s).split(" ").filter(Boolean), out = [];
     for (var i = 0; i < w.length; i++) {
@@ -1295,17 +1295,36 @@
       if (ki && out.length && wordKey(out[out.length - 1]) === ki) continue; // 直前と同じ語
       out.push(w[i]);
     }
-    // 末尾で n 語のフレーズが繰り返されていたら 1 回分に畳む（キー比較）
-    var keyOf = function (arr, a, b) {
-      return arr.slice(a, b).map(wordKey).join(" ");
-    };
-    for (var n = Math.floor(out.length / 2); n >= 1; n--) {
-      while (out.length >= 2 * n &&
-        keyOf(out, out.length - n, out.length) === keyOf(out, out.length - 2 * n, out.length - n)) {
-        out = out.slice(0, out.length - n);
+    var keys = out.map(wordKey);
+    var changed = true;
+    while (changed) {
+      changed = false;
+      var maxN = Math.min(6, Math.floor(out.length / 2));
+      for (var n = maxN; n >= 1 && !changed; n--) {
+        for (var p = 0; p + 2 * n <= out.length; p++) {
+          var same = true;
+          for (var j = 0; j < n; j++) {
+            if (keys[p + j] !== keys[p + n + j]) { same = false; break; }
+          }
+          if (same) { out.splice(p + n, n); keys.splice(p + n, n); changed = true; break; }
+        }
       }
     }
     return out.join(" ");
+  }
+  // 各要素が「前の要素を伸ばしたもの」でも重複させずに 1 本につなぐ
+  function mergeGrowing(parts) {
+    var acc = "";
+    for (var i = 0; i < parts.length; i++) {
+      var p = normSpace(parts[i]);
+      if (!p) continue;
+      if (!acc) { acc = p; continue; }
+      var ak = acc.toLowerCase(), pk = p.toLowerCase();
+      if (pk.indexOf(ak) === 0) acc = p;          // p は acc を伸ばしたもの → 置き換え
+      else if (ak.indexOf(pk) === 0) continue;    // p は acc の短い前半 → 無視
+      else acc = mergeDedupe(acc, p);             // 重なりを消してつなぐ
+    }
+    return dedupeWords(acc);
   }
   // a の末尾と b の先頭が重なっていれば b の重複分を落として連結
   function mergeDedupe(a, b) {
@@ -1327,9 +1346,9 @@
     return dedupeWords(t);
   }
   function commitSession() {
-    var seg = normSpace(sessionFinal || sessionInterim);
+    var seg = dedupeWords(normSpace(sessionFinal || sessionInterim));
     sessionFinal = ""; sessionInterim = "";
-    if (seg) committed = mergeDedupe(committed, seg);
+    if (seg) committed = dedupeWords(mergeDedupe(committed, seg));
   }
   function updateLive() { $("micLive").textContent = liveDisplay(); }
 
@@ -1341,15 +1360,15 @@
     recog.continuous = true; // 1回の発話で start() を1度だけにして「録音開始音」の連発を防ぐ（重複は下の dedupe で処理）
     recog.maxAlternatives = 1;
     recog.onresult = function (e) {
-      // 累積せず、毎回 results 全体から作り直す（重複イベント対策）
-      var fin = "", inter = "";
+      // Android は確定前の候補を results に溜め込む。確定分だけ集め、中間結果は「最新の1件」だけ使う。
+      var finals = [], lastInterim = "";
       for (var i = 0; i < e.results.length; i++) {
         var res = e.results[i];
-        if (res.isFinal) fin += res[0].transcript + " ";
-        else inter += res[0].transcript + " ";
+        if (res.isFinal) finals.push(res[0].transcript);
+        else lastInterim = res[0].transcript;
       }
-      sessionFinal = normSpace(fin);
-      sessionInterim = normSpace(inter);
+      sessionFinal = mergeGrowing(finals);
+      sessionInterim = normSpace(lastInterim);
       updateLive();
     };
     recog.onerror = function (ev) {
