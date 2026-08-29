@@ -219,6 +219,8 @@
     border-radius: 10px; width: 40px; height: 40px; font-size: 1.1rem; cursor: pointer; color: var(--text-primary);
   }
   .a-alt { font-size: 0.82rem; color: var(--text-muted); margin-top: 8px; }
+  .a-note { font-size: 0.85rem; color: var(--text-secondary); margin-top: 10px; padding: 8px 10px; border-left: 3px solid var(--border); background: var(--surface-2); border-radius: 6px; white-space: pre-wrap; }
+  .a-note::before { content: "📝 備考"; display: block; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px; }
 
   .mic-score { font-weight: 700; }
   .mic-score.good { color: var(--success); }
@@ -305,6 +307,17 @@
   .fmt-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 8px; }
   .fmt-table th, .fmt-table td { border: 1px solid var(--gridline); padding: 5px 7px; text-align: left; }
   .fmt-table th { color: var(--text-muted); font-weight: 600; }
+  .addform label { display: block; font-size: 0.8rem; color: var(--text-secondary); margin: 12px 0 4px; }
+  .addform input[type="text"], .addform input[type="password"], .addform textarea {
+    width: 100%; box-sizing: border-box; font: inherit; font-size: 0.9rem;
+    padding: 8px 10px; border: 1px solid var(--baseline); border-radius: 8px;
+    background: var(--surface); color: var(--text-primary);
+  }
+  .addform textarea { min-height: 52px; resize: vertical; line-height: 1.5; }
+  .addform .row2 { display: flex; gap: 8px; }
+  .addform .row2 > div { flex: 1; min-width: 0; }
+  .api-note { font-size: 0.78rem; color: var(--text-muted); line-height: 1.7; }
+  .api-note a { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -468,6 +481,7 @@
             <span id="aEn">—</span>
           </div>
           <div class="a-alt" id="aAlt"></div>
+          <div class="a-note" id="aNote" style="display:none"></div>
 
           <div class="wordcheck" id="wordCheck" style="display:none">
             <div class="mic-suggest" id="micSuggest"></div>
@@ -556,6 +570,61 @@
 
   <!-- ============ MY SENTENCES ============ -->
   <section class="panel" data-panel="my">
+
+    <div class="card addform">
+      <h2>自分で入力して追加</h2>
+      <p style="font-size:0.83rem;color:var(--text-secondary);margin:0 0 4px">
+        言いたかったことを日本語で入れて、英語は自動生成できます（<b>クライマーがよく使う言い方</b>で作り、
+        一般的に正しい表現は<b>備考</b>に入れます）。生成後、追加する前に自由に直せます。
+      </p>
+
+      <label for="addJa">日本語（言いたかったこと）<span style="color:var(--critical)">*</span></label>
+      <textarea id="addJa" placeholder="例：ここ、右手のガストンで我慢して左足を上げる感じ？"></textarea>
+
+      <button class="btn btn-secondary" id="btnGenEn" style="margin-top:8px">✨ 英語を自動生成（外部AIに接続）</button>
+      <div class="my-status" id="genStatus"></div>
+
+      <label for="addEn">英語（クライマーがよく使う言い方）<span style="color:var(--critical)">*</span></label>
+      <textarea id="addEn" placeholder="Do you hold the gaston with your right and bring your left foot up?"></textarea>
+
+      <label for="addNote">備考（一般的に正しい表現・語法メモなど）</label>
+      <textarea id="addNote" placeholder="一般的な言い方: ..."></textarea>
+
+      <div class="row2">
+        <div>
+          <label for="addCat">カテゴリ（任意）</label>
+          <input type="text" id="addCat" placeholder="ジムでの会話">
+        </div>
+        <div>
+          <label for="addAlt">別解（任意・; 区切り）</label>
+          <input type="text" id="addAlt">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btnAddOne" style="margin-top:14px">この文をマイ例文に追加</button>
+      <div class="my-status" id="addStatus"></div>
+    </div>
+
+    <div class="card addform">
+      <h2>AI接続の設定</h2>
+      <p class="api-note">
+        英語の自動生成には <b>Google Gemini API</b> を使います。
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> で無料のAPIキーを作って貼り付けてください。<br>
+        ・キーは<b>この端末のブラウザ内だけ</b>に保存されます（どこにも送信しません）。<br>
+        ・「英語を自動生成」を押したときだけ、入力した日本語が Google に送られます。押さなければ通信は一切しません。<br>
+        ・CSV読み込み・練習・統計などアプリの他の機能は、これまで通りネット通信をしません。
+      </p>
+      <label for="apiKey">APIキー</label>
+      <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off">
+      <label for="apiModel">モデル（通常はこのままでOK）</label>
+      <input type="text" id="apiModel" placeholder="gemini-2.5-flash">
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-primary" id="btnSaveApi">保存</button>
+        <button class="btn btn-secondary" id="btnClearApi">削除</button>
+      </div>
+      <div class="my-status" id="apiStatus"></div>
+    </div>
+
     <div class="card">
       <h2>CSVファイルから自分の例文を追加</h2>
       <p style="font-size:0.83rem;color:var(--text-secondary);margin:0 0 12px">
@@ -571,13 +640,14 @@
 
       <p class="wc-label" style="margin-top:16px">列の並び</p>
       <table class="fmt-table">
-        <thead><tr><th>1列目</th><th>2列目</th><th>3列目（任意）</th><th>4列目（任意）</th></tr></thead>
+        <thead><tr><th>1列目</th><th>2列目</th><th>3列目（任意）</th><th>4列目（任意）</th><th>5列目（任意）</th></tr></thead>
         <tbody><tr>
-          <td>日本語</td><td>英語</td><td>カテゴリ名</td><td>別解（<code class="inline">;</code> 区切り）</td>
+          <td>日本語</td><td>英語</td><td>カテゴリ名</td><td>別解（<code class="inline">;</code> 区切り）</td><td>備考</td>
         </tr></tbody>
       </table>
       <p style="font-size:0.78rem;color:var(--text-muted);margin-top:8px">
         1行目が「日本語 / 英語」などの見出しでも自動でスキップします。カテゴリ名を空にすると「自分の例文」にまとまります。
+        5列目の「備考」は答え合わせの画面に📝で表示されます（使い方・注意点・語法メモなど）。
       </p>
     </div>
 
@@ -800,7 +870,7 @@
     });
     Object.keys(groups).forEach(function (name) {
       CATS.push({ id: "cust:" + name, name: name, custom: true, items: groups[name].map(function (it) {
-        return { ja: it.ja, en: it.en, alt: it.alt || [] };
+        return { ja: it.ja, en: it.en, alt: it.alt || [], note: it.note || "" };
       })});
     });
 
@@ -808,7 +878,7 @@
     CATS.forEach(function (cat) {
       cat.items.forEach(function (it, i) {
         var id = cat.custom ? "c" + hashStr(it.ja + "|" + it.en) : cat.id + "-" + i;
-        var s = { id: id, catId: cat.id, catName: cat.name, custom: cat.custom, ja: it.ja, en: it.en, alt: it.alt || [] };
+        var s = { id: id, catId: cat.id, catName: cat.name, custom: cat.custom, ja: it.ja, en: it.en, alt: it.alt || [], note: it.note || "" };
         ALL.push(s); BY_ID[id] = s;
       });
     });
@@ -1147,6 +1217,8 @@
     $("qNote").textContent = "";
     $("aEn").textContent = s.en;
     $("aAlt").textContent = s.alt && s.alt.length ? "別解: " + s.alt.join(" / ") : "";
+    $("aNote").textContent = s.note || "";
+    $("aNote").style.display = s.note ? "block" : "none";
     $("answerBox").classList.remove("show");
     $("wordCheck").style.display = "none";
     $("micLive").textContent = "";
@@ -1266,7 +1338,7 @@
     try { recog = new SR(); } catch (e) { return; }
     recog.lang = "en-US";
     recog.interimResults = true;
-    recog.continuous = false; // スマホでは continuous=true が重複・誤認識の原因になるため単発認識にする
+    recog.continuous = true; // 1回の発話で start() を1度だけにして「録音開始音」の連発を防ぐ（重複は下の dedupe で処理）
     recog.maxAlternatives = 1;
     recog.onresult = function (e) {
       // 累積せず、毎回 results 全体から作り直す（重複イベント対策）
@@ -1294,16 +1366,22 @@
       var before = committed;
       commitSession();
       $("micLive").textContent = dedupeWords(normSpace(committed));
+      // continuous=true では onend ＝「ひと息ついた」タイミング。録音開始音を減らすため再開は最小限に。
+      // 何も取れていないうちは数回、結果が出た後は思考の間を1回ぶんだけ待って停止する。
       emptyStreak = (committed === before) ? emptyStreak + 1 : 0;
-      var stop = answerShown || !micWantActive || !listening || restartCount >= 25 || (committed && emptyStreak >= 2);
+      var stop = answerShown || !micWantActive || !listening ||
+        restartCount >= 5 || (committed && emptyStreak >= 1);
       if (!stop) {
         restartCount++;
         setTimeout(function () {
           if (micWantActive && !answerShown && listening) beginRecognition();
-        }, 350);
+        }, 300);
       } else {
         listening = false;
-        if (committed && !answerShown) micReadyHint();
+        if (!answerShown) {
+          if (committed) micReadyHint();
+          else { stopTimer(); setMicPhase("idle"); }
+        }
       }
     };
     try { recog.start(); } catch (e) {}
@@ -1612,7 +1690,9 @@
         row.className = "book-item";
         row.innerHTML =
           '<div class="bi-body"><div class="bi-ja">' + (starred ? '<span class="bi-star">★</span> ' : '') + esc(it.ja) + '</div>' +
-          '<div class="bi-en">' + esc(it.en) + '</div></div>' +
+          '<div class="bi-en">' + esc(it.en) + '</div>' +
+          (it.note ? '<div class="bi-ja" style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">📝 ' + esc(it.note) + '</div>' : '') +
+          '</div>' +
           '<button class="bi-speak" aria-label="読み上げ">🔊</button>';
         row.querySelector(".bi-speak").addEventListener("click", function () { speak(it.en); });
         block.appendChild(row);
@@ -1650,7 +1730,7 @@
       if (i === 0 && /日本語|japanese|^ja$|^jp$|問題/i.test(ja) && /英語|english|^en$|answer/i.test(en)) return;
       if (!ja || !en) return;
       var alt = (r[3] || "").split(/[;；|，、]/).map(function (x) { return x.trim(); }).filter(Boolean);
-      items.push({ ja: ja, en: en, cat: (r[2] || "").trim(), alt: alt });
+      items.push({ ja: ja, en: en, cat: (r[2] || "").trim(), alt: alt, note: (r[4] || "").trim() });
     });
     return items;
   }
@@ -1665,16 +1745,25 @@
     var reader = new FileReader();
     reader.onload = function () {
       try {
-        var items = rowsToItems(parseDelimited(String(reader.result)));
-        if (!items.length) { myStatus("有効な行が見つかりませんでした。1列目に日本語、2列目に英語が入っているか確認してください。", "err"); return; }
-        custom = { items: items, at: Date.now(), file: file.name };
+        var incoming = rowsToItems(parseDelimited(String(reader.result)));
+        if (!incoming.length) { myStatus("有効な行が見つかりませんでした。1列目に日本語、2列目に英語が入っているか確認してください。", "err"); return; }
+        var list = (custom.items || []).slice();
+        var seen = {};
+        list.forEach(function (it) { seen[it.ja + "\t" + it.en] = 1; });
+        var added = 0;
+        incoming.forEach(function (it) {
+          var k = it.ja + "\t" + it.en;
+          if (seen[k]) return;
+          seen[k] = 1; list.push(it); added++;
+        });
+        custom = { items: list, at: Date.now(), file: file.name };
         saveCustom();
         rebuildData();
         CATS.filter(function (c) { return c.custom; }).forEach(function (c) {
           if (settings.cats.indexOf(c.id) === -1) settings.cats.push(c.id);
         });
         saveSettings();
-        myStatus("✓ " + items.length + "文を読み込みました（" + esc(file.name) + "）", "ok");
+        myStatus("✓ " + added + "文を追加しました（重複 " + (incoming.length - added) + "文はスキップ／マイ例文は合計 " + list.length + "文）", "ok");
         renderMy(); renderCatList(); updateStartBtn();
       } catch (err) {
         myStatus("読み込みに失敗しました: " + err.message, "err");
@@ -1690,10 +1779,123 @@
     saveCustom(); rebuildData();
     myStatus("", ""); renderMy(); renderCatList(); updateStartBtn();
   });
+
+  /* ---------- 手入力で1文ずつ追加 ＋ 英語の自動生成（外部AI） ---------- */
+  var API_CFG_KEY = "shunkan_api_v1";
+  var apiCfg = loadJSON(API_CFG_KEY, {});
+  if (!apiCfg || typeof apiCfg !== "object") apiCfg = {};
+  function saveApiCfg() { saveJSON(API_CFG_KEY, apiCfg); }
+
+  function setStatus(id, msg, kind) {
+    var el = $(id);
+    el.textContent = msg;
+    el.className = "my-status" + (kind ? " " + kind : "");
+  }
+
+  function initApiForm() {
+    $("apiKey").value = apiCfg.key || "";
+    $("apiModel").value = apiCfg.model || "";
+  }
+  $("btnSaveApi").addEventListener("click", function () {
+    apiCfg.key = $("apiKey").value.trim();
+    apiCfg.model = $("apiModel").value.trim();
+    saveApiCfg();
+    setStatus("apiStatus", apiCfg.key ? "✓ 保存しました（この端末のブラウザ内のみ）" : "キーを空で保存しました。", apiCfg.key ? "ok" : "");
+  });
+  $("btnClearApi").addEventListener("click", function () {
+    apiCfg = {}; saveApiCfg(); initApiForm();
+    setStatus("apiStatus", "削除しました。", "");
+  });
+
+  function genPrompt(ja) {
+    return [
+      "あなたはボルダリングジムでの英会話を教えるコーチです。",
+      "日本人クライマーが外国人クライマーに言いたい日本語を渡します。次の2つを作ってください。",
+      "・en: 実際に海外のクライマーがジムや岩場で言う、自然でカジュアルな英語。",
+      "  文法の正しさより「クライマーが本当に使う言い回し・スラング」を優先。短く、中学レベルの語彙中心。",
+      "・note: 日本語での補足。より一般的・文法的に標準的な英語表現を『一般的な言い方: \"...\"』の形で示す。",
+      "  en がすでに標準的なら『標準的な表現と同じ』とだけ書く。必要なら短い語法メモを足してよい。",
+      "出力は厳密なJSONのみ。コードフェンスや前後の説明は付けない。",
+      'フォーマット: {"en":"...","note":"..."}',
+      "",
+      "日本語: " + ja
+    ].join("\n");
+  }
+
+  function generateEnglish() {
+    var ja = $("addJa").value.trim();
+    if (!ja) { setStatus("genStatus", "先に日本語を入力してください。", "err"); return; }
+    if (!apiCfg.key) { setStatus("genStatus", "APIキーが未設定です。下の「AI接続の設定」でキーを保存してください。", "err"); return; }
+    if (!window.fetch) { setStatus("genStatus", "このブラウザは自動生成に対応していません。手で入力してください。", "err"); return; }
+    var model = apiCfg.model || "gemini-2.5-flash";
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiCfg.key);
+    var body = {
+      contents: [{ parts: [{ text: genPrompt(ja) }] }],
+      generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
+    };
+    $("btnGenEn").disabled = true;
+    setStatus("genStatus", "生成中…（Google に日本語を送信しています）", "");
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
+    }).then(function (res) {
+      $("btnGenEn").disabled = false;
+      if (!res.ok) {
+        var em = res.data && res.data.error && res.data.error.message ? res.data.error.message : ("HTTP " + res.status);
+        setStatus("genStatus", "生成に失敗しました: " + em, "err");
+        return;
+      }
+      var txt = "";
+      try { txt = res.data.candidates[0].content.parts[0].text; } catch (e) {}
+      var parsed = null;
+      try { parsed = JSON.parse(txt); } catch (e) {
+        var m = txt.match(/\{[\s\S]*\}/);
+        if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) {} }
+      }
+      if (!parsed || !parsed.en) {
+        setStatus("genStatus", "返答を読み取れませんでした。もう一度試すか、手で入力してください。", "err");
+        return;
+      }
+      $("addEn").value = String(parsed.en).trim();
+      if (parsed.note) $("addNote").value = String(parsed.note).trim();
+      setStatus("genStatus", "✓ 生成しました。追加する前に内容を確認・修正できます。", "ok");
+    })["catch"](function () {
+      $("btnGenEn").disabled = false;
+      setStatus("genStatus", "接続に失敗しました（通信状況・APIキー・モデル名を確認してください）。", "err");
+    });
+  }
+  $("btnGenEn").addEventListener("click", generateEnglish);
+
+  function addOneItem() {
+    var ja = $("addJa").value.trim();
+    var en = $("addEn").value.trim();
+    if (!ja || !en) { setStatus("addStatus", "日本語と英語の両方が必要です（英語は「自動生成」でも作れます）。", "err"); return; }
+    var alt = $("addAlt").value.split(/[;；|，、]/).map(function (x) { return x.trim(); }).filter(Boolean);
+    var item = { ja: ja, en: en, cat: $("addCat").value.trim(), alt: alt, note: $("addNote").value.trim() };
+    if (!Array.isArray(custom.items)) custom.items = [];
+    custom.items.push(item);
+    custom.at = Date.now();
+    saveCustom();
+    rebuildData();
+    CATS.filter(function (c) { return c.custom; }).forEach(function (c) {
+      if (settings.cats.indexOf(c.id) === -1) settings.cats.push(c.id);
+    });
+    saveSettings();
+    $("addJa").value = ""; $("addEn").value = ""; $("addNote").value = ""; $("addAlt").value = "";
+    setStatus("genStatus", "", "");
+    setStatus("addStatus", "✓ 追加しました（マイ例文は合計 " + custom.items.length + "文）。カテゴリはそのまま残しています。", "ok");
+    renderMy(); renderCatList(); updateStartBtn();
+  }
+  $("btnAddOne").addEventListener("click", addOneItem);
+
   function renderMy() {
     var list = $("myList");
     var items = custom.items || [];
-    $("myCount").textContent = items.length ? items.length + "文" + (custom.at ? "・" + new Date(custom.at).toLocaleDateString("sv-SE") + " 読込" : "") : "";
+    $("myCount").textContent = items.length ? items.length + "文" + (custom.at ? "・" + new Date(custom.at).toLocaleDateString("sv-SE") + " 更新" : "") : "";
     $("btnClearMy").style.display = items.length ? "block" : "none";
     if (!items.length) { list.innerHTML = '<div class="empty-state">まだありません</div>'; return; }
     var groups = {};
@@ -1708,7 +1910,9 @@
         row.className = "book-item";
         row.innerHTML =
           '<div class="bi-body"><div class="bi-ja">' + esc(it.ja) + '</div>' +
-          '<div class="bi-en">' + esc(it.en) + (it.alt && it.alt.length ? ' <span style="color:var(--text-muted)">/ ' + esc(it.alt.join(" / ")) + '</span>' : '') + '</div></div>' +
+          '<div class="bi-en">' + esc(it.en) + (it.alt && it.alt.length ? ' <span style="color:var(--text-muted)">/ ' + esc(it.alt.join(" / ")) + '</span>' : '') + '</div>' +
+          (it.note ? '<div class="bi-ja" style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">📝 ' + esc(it.note) + '</div>' : '') +
+          '</div>' +
           '<button class="bi-speak" aria-label="読み上げ">🔊</button>';
         row.querySelector(".bi-speak").addEventListener("click", function () { speak(it.en); });
         block.appendChild(row);
@@ -1722,6 +1926,7 @@
   renderCatList();
   updateStartBtn();
   renderReviewBanner();
+  initApiForm();
 })();
 </script>
 </body>
