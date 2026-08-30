@@ -439,6 +439,16 @@
         </div>
 
         <div class="opt-group">
+          <div class="toggle-row">
+            <div>
+              <div class="tr-label">採点したとき効果音を鳴らす</div>
+              <div class="tr-hint">◎完璧＝明るい上昇音／○通じた＝短い上昇音／✗ダメ＝低い下降音</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="tglSfx" checked><span class="track"></span></label>
+          </div>
+        </div>
+
+        <div class="opt-group">
           <span class="opt-label">読み上げ速度 <span id="rateVal">1.0</span>x</span>
           <input type="range" id="rate" min="0.6" max="1.15" step="0.05" value="1">
         </div>
@@ -625,29 +635,42 @@
       <div class="my-status" id="apiStatus"></div>
     </div>
 
-    <div class="card">
-      <h2>CSVファイルから自分の例文を追加</h2>
-      <p style="font-size:0.83rem;color:var(--text-secondary);margin:0 0 12px">
-        Googleスプレッドシートで例文を作り、<b>ファイル → ダウンロード → カンマ区切り値（.csv）</b> で保存したものを読み込みます。
-        （Excelの「CSV UTF-8」でもOK。ネット通信はしません）
+    <div class="card addform">
+      <h2>表・スプレッドシートから追加</h2>
+      <p style="font-size:0.83rem;color:var(--text-secondary);margin:0 0 4px">
+        下の3つのどれでもOK。列の並びは <b>日本語 / 英語 / カテゴリ / 別解 / 備考</b>（3列目以降は任意）。
+        1行目が見出しでも自動でスキップし、日本語＋英語が同じ行は重複追加しません。
       </p>
 
-      <label class="file-drop" for="csvInput">
-        ここをタップして CSV ファイルを選ぶ
+      <label for="pasteBox">① 貼り付け（スプレッドシートで範囲を選んでコピー → ここに貼り付け）</label>
+      <textarea id="pasteBox" style="min-height:78px" placeholder="このホールドは遠い	This hold is far	ジムでの会話"></textarea>
+      <button class="btn btn-primary" id="btnPaste" style="margin-top:8px">貼り付けた内容を追加</button>
+
+      <label for="sheetUrl">② Googleスプレッドシートの共有URLから取り込む</label>
+      <input type="text" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..../edit#gid=0">
+      <button class="btn btn-primary" id="btnSheet" style="margin-top:8px">URLから取り込む</button>
+      <p class="api-note" style="margin-top:6px">
+        シートを「共有 →『リンクを知っている全員』（閲覧者）」にしておく必要があります。
+        「URLから取り込む」を押したときだけ Google に接続します。URLはこの端末内のみに保存します。<br>
+        取り込みは押すたびに最新の内容を読み直します（シートを直したら再取り込み）。
+      </p>
+
+      <label class="file-drop" for="csvInput" style="margin-top:16px;display:block">
+        ③ CSV / TSV ファイルを選ぶ（ここをタップ）
         <input type="file" id="csvInput" accept=".csv,.tsv,.txt,text/csv" style="display:none">
       </label>
+
       <div class="my-status" id="myStatus"></div>
 
-      <p class="wc-label" style="margin-top:16px">列の並び</p>
-      <table class="fmt-table">
-        <thead><tr><th>1列目</th><th>2列目</th><th>3列目（任意）</th><th>4列目（任意）</th><th>5列目（任意）</th></tr></thead>
+      <table class="fmt-table" style="margin-top:14px">
+        <thead><tr><th>1列目</th><th>2列目</th><th>3列目</th><th>4列目</th><th>5列目</th></tr></thead>
         <tbody><tr>
           <td>日本語</td><td>英語</td><td>カテゴリ名</td><td>別解（<code class="inline">;</code> 区切り）</td><td>備考</td>
         </tr></tbody>
       </table>
       <p style="font-size:0.78rem;color:var(--text-muted);margin-top:8px">
-        1行目が「日本語 / 英語」などの見出しでも自動でスキップします。カテゴリ名を空にすると「自分の例文」にまとまります。
-        5列目の「備考」は答え合わせの画面に📝で表示されます（使い方・注意点・語法メモなど）。
+        カテゴリ名を空にすると「自分の例文」にまとまります。
+        「備考」は答え合わせの画面に📝で表示されます（一般的に正しい表現・語法メモなど）。
       </p>
     </div>
 
@@ -827,7 +850,7 @@
   var settings = loadJSON(SETTINGS_KEY, {});
   settings = Object.assign({
     order: "shuffle", count: "20", limit: "normal",
-    readJa: true, autoStart: true, autoGrade: false, manualNext: true, mic: false, auto: true, rate: 1,
+    readJa: true, autoStart: true, autoGrade: false, manualNext: true, mic: false, auto: true, sfx: true, rate: 1,
     cats: null
   }, settings);
 
@@ -889,6 +912,47 @@
   function todayKey() { return new Date().toLocaleDateString("sv-SE"); }
   function addDaysKey(k, n) { var d = new Date(k + "T00:00:00"); d.setDate(d.getDate() + n); return d.toLocaleDateString("sv-SE"); }
   function attemptGrade(a) { return a.g != null ? a.g : (a.ok ? 2 : 0); }
+
+  /* ================= 採点の効果音 ================= */
+  var audioCtx = null;
+  function getAudioCtx() {
+    var C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    if (!audioCtx) { try { audioCtx = new C(); } catch (e) { return null; } }
+    if (audioCtx.state === "suspended" && audioCtx.resume) { try { audioCtx.resume(); } catch (e) {} }
+    return audioCtx;
+  }
+  function tone(ctx, freq, at, dur, type, peak) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    var t = ctx.currentTime + at;
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak || 0.22, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t);
+    o.stop(t + dur + 0.03);
+  }
+  function playResultSound(g) {
+    if (!settings.sfx) return;
+    var ctx = getAudioCtx();
+    if (!ctx) return;
+    if (g === 2) {
+      // ◎ 完璧：明るく上がっていくアルペジオ（長め）
+      [523.25, 659.25, 783.99, 1046.5].forEach(function (f, i) {
+        tone(ctx, f, i * 0.10, 0.22, "triangle", 0.24);
+      });
+    } else if (g === 1) {
+      // ○ 通じた：短く上がる2音（素直なサイン）
+      tone(ctx, 587.33, 0, 0.12, "sine", 0.20);
+      tone(ctx, 830.61, 0.12, 0.16, "sine", 0.20);
+    } else {
+      // ✗ ダメ：低く下がる2音（濁ったノコギリ波）
+      tone(ctx, 233.08, 0, 0.18, "sawtooth", 0.16);
+      tone(ctx, 155.56, 0.17, 0.34, "sawtooth", 0.16);
+    }
+  }
 
   /* ================= 音声（読み上げ） ================= */
   var enVoice = null, jaVoice = null;
@@ -1125,6 +1189,7 @@
   bindToggle("tglAutoStart", "autoStart");
   bindToggle("tglManualNext", "manualNext");
   bindToggle("tglAuto", "auto");
+  bindToggle("tglSfx", "sfx", function () { if (settings.sfx) playResultSound(2); });
 
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var micSupported = !!SR;
@@ -1520,6 +1585,7 @@
 
   function judge(g, forceAdvance) {
     if (!answerShown || awaitingNext) return;
+    playResultSound(g);
     var s = queue[idx];
     attempts.push({ d: todayKey(), c: s.catId, g: g });
     saveAttempts();
@@ -1758,39 +1824,82 @@
     el.textContent = msg;
     el.className = "my-status" + (kind ? " " + kind : "");
   }
+  function importItems(incoming, label) {
+    if (!incoming || !incoming.length) {
+      myStatus("有効な行が見つかりませんでした。日本語と英語の2列が入っているか確認してください。", "err");
+      return;
+    }
+    var list = (custom.items || []).slice();
+    var seen = {};
+    list.forEach(function (it) { seen[it.ja + "\t" + it.en] = 1; });
+    var added = 0;
+    incoming.forEach(function (it) {
+      var k = it.ja + "\t" + it.en;
+      if (seen[k]) return;
+      seen[k] = 1; list.push(it); added++;
+    });
+    custom = { items: list, at: Date.now(), file: label || custom.file || "" };
+    saveCustom();
+    rebuildData();
+    CATS.filter(function (c) { return c.custom; }).forEach(function (c) {
+      if (settings.cats.indexOf(c.id) === -1) settings.cats.push(c.id);
+    });
+    saveSettings();
+    myStatus("✓ " + added + "文を追加しました（重複 " + (incoming.length - added) + "文はスキップ／マイ例文は合計 " + list.length + "文）", "ok");
+    renderMy(); renderCatList(); updateStartBtn();
+  }
+
   $("csvInput").addEventListener("change", function (e) {
     var file = e.target.files && e.target.files[0];
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
-      try {
-        var incoming = rowsToItems(parseDelimited(String(reader.result)));
-        if (!incoming.length) { myStatus("有効な行が見つかりませんでした。1列目に日本語、2列目に英語が入っているか確認してください。", "err"); return; }
-        var list = (custom.items || []).slice();
-        var seen = {};
-        list.forEach(function (it) { seen[it.ja + "\t" + it.en] = 1; });
-        var added = 0;
-        incoming.forEach(function (it) {
-          var k = it.ja + "\t" + it.en;
-          if (seen[k]) return;
-          seen[k] = 1; list.push(it); added++;
-        });
-        custom = { items: list, at: Date.now(), file: file.name };
-        saveCustom();
-        rebuildData();
-        CATS.filter(function (c) { return c.custom; }).forEach(function (c) {
-          if (settings.cats.indexOf(c.id) === -1) settings.cats.push(c.id);
-        });
-        saveSettings();
-        myStatus("✓ " + added + "文を追加しました（重複 " + (incoming.length - added) + "文はスキップ／マイ例文は合計 " + list.length + "文）", "ok");
-        renderMy(); renderCatList(); updateStartBtn();
-      } catch (err) {
-        myStatus("読み込みに失敗しました: " + err.message, "err");
-      }
+      try { importItems(rowsToItems(parseDelimited(String(reader.result))), file.name); }
+      catch (err) { myStatus("読み込みに失敗しました: " + err.message, "err"); }
     };
     reader.onerror = function () { myStatus("ファイルを読めませんでした。", "err"); };
     reader.readAsText(file, "UTF-8");
     e.target.value = "";
+  });
+
+  $("btnPaste").addEventListener("click", function () {
+    var txt = $("pasteBox").value;
+    if (!txt.trim()) { myStatus("貼り付け欄が空です。", "err"); return; }
+    try {
+      importItems(rowsToItems(parseDelimited(txt)), "貼り付け");
+      $("pasteBox").value = "";
+    } catch (err) { myStatus("読み取りに失敗しました: " + err.message, "err"); }
+  });
+
+  function sheetCsvUrl(u) {
+    var m = String(u).match(/\/spreadsheets\/d\/([a-zA-Z0-9_\-]+)/);
+    if (!m) return null;
+    var gm = String(u).match(/gid=([0-9]+)/);
+    var gid = gm ? gm[1] : "0";
+    return "https://docs.google.com/spreadsheets/d/" + m[1] + "/gviz/tq?tqx=out:csv&gid=" + gid;
+  }
+  $("btnSheet").addEventListener("click", function () {
+    var raw = $("sheetUrl").value.trim();
+    var url = sheetCsvUrl(raw);
+    if (!url) { myStatus("スプレッドシートのURLを確認してください（docs.google.com/spreadsheets/d/... の形）。", "err"); return; }
+    if (!window.fetch) { myStatus("このブラウザはURL取り込みに非対応です。①の貼り付けを使ってください。", "err"); return; }
+    apiCfg.sheetUrl = raw; saveApiCfg();
+    $("btnSheet").disabled = true;
+    myStatus("取り込み中…（Google に接続しています）", "");
+    fetch(url, { credentials: "omit" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    }).then(function (text) {
+      $("btnSheet").disabled = false;
+      if (/^\s*<(!doctype|html)/i.test(text)) {
+        myStatus("シートを読めませんでした。共有設定を「リンクを知っている全員（閲覧者）」にしてください。", "err");
+        return;
+      }
+      importItems(rowsToItems(parseDelimited(text)), "スプレッドシート");
+    })["catch"](function () {
+      $("btnSheet").disabled = false;
+      myStatus("取り込めませんでした。共有設定が「リンクを知っている全員」か確認してください。だめなら①の貼り付けが確実です。", "err");
+    });
   });
   $("btnClearMy").addEventListener("click", function () {
     if (!confirm("マイ例文をすべて削除します。よろしいですか？（統計・復習キューには影響しません）")) return;
@@ -1814,6 +1923,7 @@
   function initApiForm() {
     $("apiKey").value = apiCfg.key || "";
     $("apiModel").value = apiCfg.model || "";
+    $("sheetUrl").value = apiCfg.sheetUrl || "";
   }
   $("btnSaveApi").addEventListener("click", function () {
     apiCfg.key = $("apiKey").value.trim();
