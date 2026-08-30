@@ -638,8 +638,8 @@
       </p>
       <label for="apiKey">APIキー</label>
       <input type="password" id="apiKey" placeholder="Google AI Studio で取得したキーを貼り付け" autocomplete="off">
-      <label for="apiModel">モデル（通常はこのままでOK）</label>
-      <input type="text" id="apiModel" placeholder="gemini-2.5-flash">
+      <label for="apiModel">モデル（空欄なら gemini-flash-latest。エラーが出たら gemini-3.6-flash などを指定）</label>
+      <input type="text" id="apiModel" placeholder="gemini-flash-latest">
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn btn-primary" id="btnSaveApi">保存</button>
         <button class="btn btn-secondary" id="btnClearApi">削除</button>
@@ -1968,7 +1968,7 @@
     if (!ja) { setStatus("genStatus", "先に日本語を入力してください。", "err"); return; }
     if (!apiCfg.key) { setStatus("genStatus", "APIキーが未設定です。下の「AI接続の設定」でキーを保存してください。", "err"); return; }
     if (!window.fetch) { setStatus("genStatus", "このブラウザは自動生成に対応していません。手で入力してください。", "err"); return; }
-    var model = apiCfg.model || "gemini-2.5-flash";
+    var model = apiCfg.model || "gemini-flash-latest";
     // キーは URL クエリではなくヘッダで送る（ブラウザ履歴・拡張機能・ログに残さない）
     var url = "https://generativelanguage.googleapis.com/v1beta/models/" +
       encodeURIComponent(model) + ":generateContent";
