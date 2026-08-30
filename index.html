@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  base-uri 'none';
+  object-src 'none';
+  frame-src 'none';
+  worker-src 'none';
+  form-action 'none';
+  img-src 'self' data:;
+  style-src 'self' 'unsafe-inline';
+  script-src 'self' 'unsafe-inline';
+  connect-src https://generativelanguage.googleapis.com https://docs.google.com https://*.googleusercontent.com;
+">
 <title>瞬間英作文（クライミング編）</title>
 <style>
   :root {
@@ -625,7 +637,7 @@
         ・CSV読み込み・練習・統計などアプリの他の機能は、これまで通りネット通信をしません。
       </p>
       <label for="apiKey">APIキー</label>
-      <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off">
+      <input type="password" id="apiKey" placeholder="Google AI Studio で取得したキーを貼り付け" autocomplete="off">
       <label for="apiModel">モデル（通常はこのままでOK）</label>
       <input type="text" id="apiModel" placeholder="gemini-2.5-flash">
       <div style="display:flex;gap:8px;margin-top:12px">
@@ -1957,8 +1969,9 @@
     if (!apiCfg.key) { setStatus("genStatus", "APIキーが未設定です。下の「AI接続の設定」でキーを保存してください。", "err"); return; }
     if (!window.fetch) { setStatus("genStatus", "このブラウザは自動生成に対応していません。手で入力してください。", "err"); return; }
     var model = apiCfg.model || "gemini-2.5-flash";
+    // キーは URL クエリではなくヘッダで送る（ブラウザ履歴・拡張機能・ログに残さない）
     var url = "https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiCfg.key);
+      encodeURIComponent(model) + ":generateContent";
     var body = {
       contents: [{ parts: [{ text: genPrompt(ja) }] }],
       generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
@@ -1967,7 +1980,7 @@
     setStatus("genStatus", "生成中…（Google に日本語を送信しています）", "");
     fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiCfg.key },
       body: JSON.stringify(body)
     }).then(function (r) {
       return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
