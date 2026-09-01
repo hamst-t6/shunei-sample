@@ -1963,52 +1963,83 @@
     ].join("\n");
   }
 
+  function isRetryable(status, msg) {
+    return status === 429 || status === 500 || status === 503 ||
+      /high demand|overload|unavailable|try again later|rate limit|quota/i.test(msg || "");
+  }
+  function modelUnavailable(status, msg) {
+    return status === 404 || /no longer available|not available|not found|not supported|update your code/i.test(msg || "");
+  }
   function generateEnglish() {
     var ja = $("addJa").value.trim();
     if (!ja) { setStatus("genStatus", "先に日本語を入力してください。", "err"); return; }
     if (!apiCfg.key) { setStatus("genStatus", "APIキーが未設定です。下の「AI接続の設定」でキーを保存してください。", "err"); return; }
     if (!window.fetch) { setStatus("genStatus", "このブラウザは自動生成に対応していません。手で入力してください。", "err"); return; }
-    var model = apiCfg.model || "gemini-flash-latest";
-    // キーは URL クエリではなくヘッダで送る（ブラウザ履歴・拡張機能・ログに残さない）
-    var url = "https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(model) + ":generateContent";
-    var body = {
+
+    // 混雑時にそなえて、指定モデル → 軽量モデルの順で試す
+    var models = [], seen = {};
+    [apiCfg.model, "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.0-flash"].forEach(function (m) {
+      if (m && !seen[m]) { seen[m] = 1; models.push(m); }
+    });
+    var body = JSON.stringify({
       contents: [{ parts: [{ text: genPrompt(ja) }] }],
       generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
-    };
-    $("btnGenEn").disabled = true;
-    setStatus("genStatus", "生成中…（Google に日本語を送信しています）", "");
-    fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiCfg.key },
-      body: JSON.stringify(body)
-    }).then(function (r) {
-      return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
-    }).then(function (res) {
-      $("btnGenEn").disabled = false;
-      if (!res.ok) {
-        var em = res.data && res.data.error && res.data.error.message ? res.data.error.message : ("HTTP " + res.status);
-        setStatus("genStatus", "生成に失敗しました: " + em, "err");
-        return;
-      }
-      var txt = "";
-      try { txt = res.data.candidates[0].content.parts[0].text; } catch (e) {}
-      var parsed = null;
-      try { parsed = JSON.parse(txt); } catch (e) {
-        var m = txt.match(/\{[\s\S]*\}/);
-        if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) {} }
-      }
-      if (!parsed || !parsed.en) {
-        setStatus("genStatus", "返答を読み取れませんでした。もう一度試すか、手で入力してください。", "err");
-        return;
-      }
-      $("addEn").value = String(parsed.en).trim();
-      if (parsed.note) $("addNote").value = String(parsed.note).trim();
-      setStatus("genStatus", "✓ 生成しました。追加する前に内容を確認・修正できます。", "ok");
-    })["catch"](function () {
-      $("btnGenEn").disabled = false;
-      setStatus("genStatus", "接続に失敗しました（通信状況・APIキー・モデル名を確認してください）。", "err");
     });
+    var TRIES_PER_MODEL = 2;
+    $("btnGenEn").disabled = true;
+
+    function done(msg, kind) { $("btnGenEn").disabled = false; setStatus("genStatus", msg, kind); }
+    function toNextModel(delay) {
+      // このモデルは飛ばして次のモデルへ
+      return function (mi) {
+        if (mi + 1 < models.length) setTimeout(function () { attempt(mi + 1, 0); }, delay);
+        else done("利用できるAIモデルが見つかりませんでした。「AI接続の設定」のモデル欄に gemini-3.6-flash などを入れて保存してください。", "err");
+      };
+    }
+    function nextStep(mi, tries) {
+      if (tries + 1 < TRIES_PER_MODEL) {
+        setTimeout(function () { attempt(mi, tries + 1); }, 1500 * Math.pow(2, tries));
+      } else if (mi + 1 < models.length) {
+        setTimeout(function () { attempt(mi + 1, 0); }, 800);
+      } else {
+        done("AIが混雑しているようです。少し時間を置いて試すか、英語は手入力でも追加できます。", "err");
+      }
+    }
+    function attempt(mi, tries) {
+      var model = models[mi];
+      setStatus("genStatus", "生成中…（" + model + (mi > 0 || tries > 0 ? "・再試行" : "") + "）", "");
+      var url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(model) + ":generateContent";
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiCfg.key },
+        body: body
+      }).then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
+      }).then(function (res) {
+        if (!res.ok) {
+          var em = res.data && res.data.error && res.data.error.message ? res.data.error.message : ("HTTP " + res.status);
+          if (modelUnavailable(res.status, em)) { toNextModel(300)(mi); return; }
+          if (isRetryable(res.status, em)) { nextStep(mi, tries); return; }
+          done("生成に失敗しました: " + em, "err");
+          return;
+        }
+        var txt = "";
+        try { txt = res.data.candidates[0].content.parts[0].text; } catch (e) {}
+        var parsed = null;
+        try { parsed = JSON.parse(txt); } catch (e) {
+          var m = txt.match(/\{[\s\S]*\}/);
+          if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) {} }
+        }
+        if (!parsed || !parsed.en) { done("返答を読み取れませんでした。もう一度試すか、手で入力してください。", "err"); return; }
+        $("addEn").value = String(parsed.en).trim();
+        if (parsed.note) $("addNote").value = String(parsed.note).trim();
+        done("✓ 生成しました（" + model + "）。追加する前に内容を確認・修正できます。", "ok");
+      })["catch"](function () {
+        nextStep(mi, tries);
+      });
+    }
+    attempt(0, 0);
   }
   $("btnGenEn").addEventListener("click", generateEnglish);
 
