@@ -319,6 +319,16 @@
   .fmt-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 8px; }
   .fmt-table th, .fmt-table td { border: 1px solid var(--gridline); padding: 5px 7px; text-align: left; }
   .fmt-table th { color: var(--text-muted); font-weight: 600; }
+  .ch-head {
+    display: flex; align-items: center; gap: 8px;
+    margin: 16px 0 6px; padding: 6px 2px 5px;
+    border-bottom: 2px solid var(--baseline);
+  }
+  .ch-head:first-child { margin-top: 2px; }
+  .ch-head .ch-title { flex: 1; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.02em; }
+  .ch-head .ch-count { font-size: 0.74rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .ch-head .ch-toggle { font-size: 0.74rem; }
+  .ch-head-book { margin: 22px 4px 10px; }
   .addform label { display: block; font-size: 0.8rem; color: var(--text-secondary); margin: 12px 0 4px; }
   .addform input[type="text"], .addform input[type="password"], .addform textarea {
     width: 100%; box-sizing: border-box; font: inherit; font-size: 0.9rem;
@@ -361,6 +371,9 @@
           <h2 style="margin:0">出題するカテゴリ</h2>
           <button class="link-btn" id="btnToggleAllCats">すべて解除</button>
         </div>
+        <p style="margin:0 0 4px;font-size:0.78rem;color:var(--text-muted)">
+          文法別クライミング英会話 基礎編。Chapter ごとの「選択／解除」でまとめて切り替えできます。
+        </p>
         <div class="cat-list" id="catList"></div>
       </div>
 
@@ -381,6 +394,7 @@
             <button data-val="10">10</button>
             <button data-val="20" class="active">20</button>
             <button data-val="30">30</button>
+            <button data-val="50">50</button>
             <button data-val="all">すべて</button>
           </div>
         </div>
@@ -700,156 +714,513 @@
   "use strict";
 
   /* ================= 組み込みデータ ================= */
+  var CHAPTERS = [
+    { ch: 1, name: "Chapter 1 ・文の基本と時制・助動詞" },
+    { ch: 2, name: "Chapter 2 ・受動態・疑問・準動詞・比較" },
+    { ch: 3, name: "Chapter 3 ・接続詞・関係詞・完了形" }
+  ];
+
   var BUILTIN = [
-    { id: "be", name: "be動詞（現在）", items: [
+    /* ===== Chapter 1 ===== */
+    { id: "c1-be", ch: 1, name: "be動詞", items: [
       { ja: "このホールドは小さい。", en: "This hold is small." },
       { ja: "壁がとても高い。", en: "The wall is very high." },
       { ja: "私はクライミングが得意だ。", en: "I am good at climbing.", alt: ["I'm good at climbing."] },
       { ja: "今日は指が疲れている。", en: "My fingers are tired today." },
       { ja: "この課題は僕には難しい。", en: "This problem is hard for me." },
-      { ja: "君のクライミングシューズは新しいね。", en: "Your climbing shoes are new." },
-      { ja: "私たちは今ジムにいる。", en: "We are at the gym now.", alt: ["We're at the gym now."] },
       { ja: "その岩は滑りやすい。", en: "That rock is slippery." }
     ]},
-    { id: "verb", name: "一般動詞（現在）", items: [
+    { id: "c1-verb", ch: 1, name: "一般動詞", items: [
       { ja: "私は毎週末クライミングに行く。", en: "I go climbing every weekend." },
       { ja: "私はこの課題が好きだ。", en: "I like this problem." },
-      { ja: "私たちは登る前にストレッチをする。", en: "We stretch before we climb." },
       { ja: "私は手にチョークをつける。", en: "I put chalk on my hands." },
-      { ja: "彼らは同じジムで練習する。", en: "They practice at the same gym." },
-      { ja: "私はマットの上に着地する。", en: "I land on the crash pad." },
+      { ja: "私は登る前にルートを見る。", en: "I look at the route before I climb." },
       { ja: "私は難しい課題に挑戦する。", en: "I try hard problems." },
-      { ja: "私は登る前にルートを見る。", en: "I look at the route before I climb." }
+      { ja: "私はマットの上に着地する。", en: "I land on the crash pad." }
     ]},
-    { id: "third", name: "三人称単数現在（-s）", items: [
-      { ja: "彼は毎日登る。", en: "He climbs every day." },
-      { ja: "彼女はとても上手に登る。", en: "She climbs really well." },
-      { ja: "私の友達はこのジムで働いている。", en: "My friend works at this gym." },
-      { ja: "彼は簡単にトップまで行く。", en: "He gets to the top easily." },
-      { ja: "彼女はいつも足を使う。", en: "She always uses her feet." },
-      { ja: "私の兄はよく落ちる。", en: "My brother falls a lot." },
-      { ja: "このルートは右に曲がっている。", en: "This route goes to the right." },
-      { ja: "彼は毎回そのホールドを取り損ねる。", en: "He misses that hold every time." }
+    { id: "c1-third", ch: 1, name: "三単現の文", items: [
+      { ja: "彼は毎日ジムに来る。", en: "He comes to the gym every day." },
+      { ja: "彼女はこの課題を簡単に登る。", en: "She climbs this problem easily." },
+      { ja: "彼はいつも足をよく使う。", en: "He always uses his feet well." },
+      { ja: "彼女は週に3回練習する。", en: "She practices three times a week." },
+      { ja: "私の友達は外岩が好きだ。", en: "My friend likes outdoor climbing." },
+      { ja: "彼がマットを動かしてくれる。", en: "He moves the crash pad." }
     ]},
-    { id: "prog", name: "現在進行形", items: [
-      { ja: "私は今、課題に取り組んでいる。", en: "I am working on a problem now.", alt: ["I'm working on a problem now."] },
-      { ja: "彼女は今、トップに手を伸ばしている。", en: "She is reaching for the top.", alt: ["She's reaching for the top."] },
-      { ja: "私たちは順番を待っている。", en: "We are waiting for our turn." },
-      { ja: "私の腕が震えている。", en: "My arms are shaking." },
-      { ja: "彼はマットの上で休んでいる。", en: "He is resting on the crash pad." },
-      { ja: "私は次の一手を考えている。", en: "I am thinking about my next move." },
-      { ja: "私は落ちないように頑張っている。", en: "I am trying not to fall." },
-      { ja: "君はうまく登っているよ。", en: "You are climbing well." }
+    { id: "c1-sv", ch: 1, name: "SV（第1文型）", items: [
+      { ja: "私は落ちた。", en: "I fell." },
+      { ja: "彼は速く登る。", en: "He climbs fast." },
+      { ja: "私たちは2時に会う。", en: "We meet at two." },
+      { ja: "私の手が滑った。", en: "My hand slipped." },
+      { ja: "彼女はマットの上で待つ。", en: "She waits on the mat." },
+      { ja: "みんなが拍手した。", en: "Everyone clapped." }
     ]},
-    { id: "can", name: "can（助動詞）", items: [
-      { ja: "私はこの課題を登れる。", en: "I can climb this problem." },
-      { ja: "私はそのホールドに届かない。", en: "I can't reach that hold.", alt: ["I cannot reach that hold."] },
-      { ja: "君はトップから飛び降りられる。", en: "You can jump down from the top." },
-      { ja: "彼女は片手で体を支えられる。", en: "She can hold on with one hand." },
-      { ja: "ここで少し休める。", en: "You can take a short rest here." },
-      { ja: "私は手を離せない。", en: "I can't let go.", alt: ["I cannot let go."] },
-      { ja: "今日はもっと難しいのに挑戦できる。", en: "I can try a harder one today." },
-      { ja: "君のクライミングシューズを借りてもいい？", en: "Can I borrow your climbing shoes?" }
+    { id: "c1-svc", ch: 1, name: "SVC（第2文型）", items: [
+      { ja: "この課題は簡単そうに見える。", en: "This problem looks easy." },
+      { ja: "そのホールドはざらざらしている。", en: "That hold feels rough." },
+      { ja: "私は疲れてきた。", en: "I am getting tired.", alt: ["I'm getting tired."] },
+      { ja: "彼は強いクライマーになった。", en: "He became a strong climber." },
+      { ja: "岩は雨のあと濡れたままだ。", en: "The rock stays wet after the rain." },
+      { ja: "君の登りはきれいに見えた。", en: "Your climbing looked smooth." }
     ]},
-    { id: "past", name: "過去形", items: [
-      { ja: "昨日、私はその課題を完登した。", en: "I finished the problem yesterday." },
-      { ja: "私は途中で落ちた。", en: "I fell in the middle." },
-      { ja: "私たちは3時間登った。", en: "We climbed for three hours." },
-      { ja: "彼はトップを取った。", en: "He got the top." },
-      { ja: "私は足を滑らせた。", en: "My foot slipped." },
-      { ja: "そのホールドはとても小さかった。", en: "That hold was very small." },
-      { ja: "私は昨夜、指を痛めた。", en: "I hurt my finger last night." },
-      { ja: "私たちは新しいジムに行った。", en: "We went to a new gym." }
+    { id: "c1-svo", ch: 1, name: "SVO（第3文型）", items: [
+      { ja: "私はそのホールドをつかんだ。", en: "I grabbed the hold." },
+      { ja: "私は新しいシューズを買った。", en: "I bought new shoes." },
+      { ja: "彼はトップを取った。", en: "He got the top.", alt: ["He topped it out."] },
+      { ja: "私はこの課題が分からない。", en: "I don't understand this problem." },
+      { ja: "彼女はルートを覚えた。", en: "She remembered the route." },
+      { ja: "私はチョークバッグを忘れた。", en: "I forgot my chalk bag." }
     ]},
-    { id: "future", name: "未来（will / be going to）", items: [
-      { ja: "明日クライミングに行くつもりだ。", en: "I am going to go climbing tomorrow.", alt: ["I'm going to go climbing tomorrow.", "I will go climbing tomorrow."] },
-      { ja: "私はこの課題をいつか完登するだろう。", en: "I will finish this problem someday.", alt: ["I'll finish this problem someday."] },
-      { ja: "来週、大会に出るつもりだ。", en: "I am going to enter a competition next week." },
-      { ja: "次はうまくいくよ。", en: "It will go well next time.", alt: ["It'll go well next time."] },
-      { ja: "私はもっと練習するつもりだ。", en: "I am going to practice more.", alt: ["I will practice more."] },
-      { ja: "週末は雨が降るだろう。", en: "It will rain this weekend." },
-      { ja: "私が下でマットを持つよ。", en: "I will hold the crash pad for you.", alt: ["I'll hold the crash pad for you."] },
-      { ja: "私たちはトップで写真を撮るつもりだ。", en: "We are going to take a photo at the top." }
+    { id: "c1-svoo", ch: 1, name: "SVOO（第4文型）", items: [
+      { ja: "彼は私にコツを教えてくれた。", en: "He taught me the trick." },
+      { ja: "彼女は私にテープをくれた。", en: "She gave me some tape." },
+      { ja: "私は彼にアドバイスをした。", en: "I gave him some advice." },
+      { ja: "友達が私に水を買ってくれた。", en: "My friend bought me some water." },
+      { ja: "彼は私にベータを見せてくれた。", en: "He showed me the beta." },
+      { ja: "私は彼女に質問をした。", en: "I asked her a question." }
     ]},
-    { id: "wh", name: "疑問詞（what / where / how …）", items: [
-      { ja: "この課題のグレードは何ですか？", en: "What is the grade of this problem?", alt: ["What's the grade of this problem?"] },
-      { ja: "ジムはどこにありますか？", en: "Where is the gym?", alt: ["Where's the gym?"] },
-      { ja: "どうやってあのホールドを取るの？", en: "How do you get that hold?" },
-      { ja: "次はどのルートを登る？", en: "Which route will you climb next?" },
-      { ja: "なぜ落ちたと思う？", en: "Why do you think you fell?" },
-      { ja: "いつクライミングを始めたの？", en: "When did you start climbing?" },
-      { ja: "誰がこの課題を作ったの？", en: "Who made this problem?" },
-      { ja: "何回挑戦したの？", en: "How many times did you try?" }
+    { id: "c1-svo-tofor", ch: 1, name: "SVO to / for O", items: [
+      { ja: "彼はベータを私に見せてくれた。", en: "He showed the beta to me." },
+      { ja: "彼女はテープを私にくれた。", en: "She gave some tape to me." },
+      { ja: "私は水を彼に買ってあげた。", en: "I bought some water for him." },
+      { ja: "マットを私に渡してください。", en: "Please pass the crash pad to me." },
+      { ja: "彼は新しい課題を私たちに作ってくれた。", en: "He made a new problem for us." },
+      { ja: "私はシューズを友達に貸した。", en: "I lent my shoes to my friend." }
     ]},
-    { id: "imp", name: "命令文・依頼", items: [
-      { ja: "足元を見て。", en: "Look at your feet." },
+    { id: "c1-svoc", ch: 1, name: "SVOC（第5文型）", items: [
+      { ja: "みんなが彼をチャンピオンと呼ぶ。", en: "Everyone calls him the champion." },
+      { ja: "その課題は私を強くした。", en: "That problem made me strong." },
+      { ja: "私はこの動きが簡単だと思う。", en: "I find this move easy." },
+      { ja: "私はマットをきれいにしておく。", en: "I keep the mat clean." },
+      { ja: "彼はそのホールドをピンチと呼んだ。", en: "He called that hold a pinch." },
+      { ja: "登ることは私を幸せにする。", en: "Climbing makes me happy." }
+    ]},
+    { id: "c1-imp", ch: 1, name: "命令文 / Let's", items: [
+      { ja: "足を使って。", en: "Use your feet." },
       { ja: "手を離さないで。", en: "Don't let go." },
-      { ja: "一緒に登ろう。", en: "Let's climb together." },
-      { ja: "マットを動かしてください。", en: "Please move the crash pad." },
-      { ja: "深呼吸して。", en: "Take a deep breath." },
-      { ja: "焦らないで。", en: "Don't rush." },
-      { ja: "ここで待ってて。", en: "Wait here." },
-      { ja: "チョークを取って。", en: "Pass me the chalk, please." }
+      { ja: "登る前にストレッチしよう。", en: "Let's stretch before we climb." },
+      { ja: "少し休もう。", en: "Let's take a break." },
+      { ja: "マットをこっちに動かして。", en: "Move the crash pad over here." },
+      { ja: "もう一回やってみて。", en: "Try it one more time." }
     ]},
-    { id: "there", name: "There is / There are", items: [
-      { ja: "壁に大きなホールドがある。", en: "There is a big hold on the wall.", alt: ["There's a big hold on the wall."] },
-      { ja: "ジムにはたくさんの課題がある。", en: "There are many problems at the gym." },
-      { ja: "トップの近くに良い足場がある。", en: "There is a good foothold near the top." },
-      { ja: "今日はジムに人が多い。", en: "There are a lot of people at the gym today." },
-      { ja: "この課題に簡単な部分はない。", en: "There is no easy part in this problem." },
-      { ja: "壁の下にマットが2枚ある。", en: "There are two crash pads under the wall." },
-      { ja: "次の一手の前に休める場所がある。", en: "There is a place to rest before the next move." },
-      { ja: "初心者向けのルートがいくつかある。", en: "There are some routes for beginners." }
+    { id: "c1-prog", ch: 1, name: "現在進行形 / 過去進行形", items: [
+      { ja: "彼は今その課題を登っている。", en: "He is climbing that problem now." },
+      { ja: "私はベータを考えている。", en: "I am thinking about the beta." },
+      { ja: "私が落ちたとき、彼女は見ていた。", en: "She was watching when I fell." },
+      { ja: "彼らは順番を待っている。", en: "They are waiting for their turn." },
+      { ja: "私はそのとき休んでいた。", en: "I was resting then." },
+      { ja: "雨が降り始めている。", en: "It is starting to rain." }
     ]},
-    { id: "toinf", name: "不定詞（to + 動詞）", items: [
-      { ja: "私はもっと強くなりたい。", en: "I want to be stronger." },
-      { ja: "この課題を完登するのは難しい。", en: "It is hard to finish this problem.", alt: ["It's hard to finish this problem."] },
-      { ja: "私は足を使うことを覚えた。", en: "I learned to use my feet." },
-      { ja: "彼女は休むために止まった。", en: "She stopped to rest." },
-      { ja: "私はあなたと登れて嬉しい。", en: "I am happy to climb with you." },
-      { ja: "私には練習する時間がない。", en: "I don't have time to practice." },
-      { ja: "私はトップを取ろうとした。", en: "I tried to get the top." },
-      { ja: "まず足から動かすことが大事だ。", en: "It is important to move your feet first." }
+    { id: "c1-it", ch: 1, name: "it（天気・時間）", items: [
+      { ja: "今日は暑い。", en: "It is hot today.", alt: ["It's hot today."] },
+      { ja: "今、何時ですか。", en: "What time is it now?" },
+      { ja: "もう5時だ。", en: "It is five o'clock." },
+      { ja: "外は雨が降っている。", en: "It is raining outside." },
+      { ja: "ジムまで10分かかる。", en: "It takes ten minutes to the gym." },
+      { ja: "今日は岩場が寒い。", en: "It is cold at the crag today." }
     ]},
-    { id: "gerund", name: "動名詞（-ing）", items: [
-      { ja: "私はクライミングが大好きだ。", en: "I love climbing." },
-      { ja: "落ちることを怖がらないで。", en: "Don't be afraid of falling." },
-      { ja: "登る前にストレッチするのは大切だ。", en: "Stretching before climbing is important." },
-      { ja: "私は指のトレーニングをやめた。", en: "I stopped training my fingers." },
-      { ja: "彼はあきらめずに登り続けた。", en: "He kept climbing." },
-      { ja: "足を見ることは上達の助けになる。", en: "Watching your feet helps you improve." },
-      { ja: "今日は登る気分じゃない。", en: "I don't feel like climbing today." },
-      { ja: "チョークなしで登るのは難しい。", en: "Climbing without chalk is hard." }
+    { id: "c1-neg-tag", ch: 1, name: "否定疑問文 / 付加疑問文", items: [
+      { ja: "疲れてないの？", en: "Aren't you tired?" },
+      { ja: "その課題、難しいよね？", en: "That problem is hard, isn't it?" },
+      { ja: "君はここは初めてだよね？", en: "You are new here, aren't you?" },
+      { ja: "足を使わないの？", en: "Don't you use your feet?" },
+      { ja: "君も登るよね？", en: "You will climb too, won't you?" },
+      { ja: "怖くないの？", en: "Aren't you scared?" }
     ]},
-    { id: "compare", name: "比較級・最上級", items: [
-      { ja: "この課題は前のより難しい。", en: "This problem is harder than the last one." },
-      { ja: "彼女はジムで一番強いクライマーだ。", en: "She is the strongest climber at the gym." },
-      { ja: "今日は昨日より調子がいい。", en: "I feel better than yesterday." },
-      { ja: "このホールドはあれより大きい。", en: "This hold is bigger than that one." },
-      { ja: "足を使う方が腕を使うより楽だ。", en: "Using your feet is easier than using your arms." },
-      { ja: "これはここで一番高い壁だ。", en: "This is the highest wall here." },
+    { id: "c1-will", ch: 1, name: "will（単純未来・意志未来）", items: [
+      { ja: "明日は雨が降るだろう。", en: "It will rain tomorrow." },
+      { ja: "私はもう一回やってみる。", en: "I will try it again.", alt: ["I'll try it again."] },
+      { ja: "彼はきっとトップを取るだろう。", en: "He will get the top." },
+      { ja: "私は今日はここでやめておく。", en: "I will stop here today." },
+      { ja: "来週も来るよ。", en: "I will come next week too." },
+      { ja: "次は登れると思う。", en: "I think I will send it next time." }
+    ]},
+    { id: "c1-going", ch: 1, name: "be going to", items: [
+      { ja: "私は今週末、外岩に行く予定だ。", en: "I am going to climb outside this weekend." },
+      { ja: "彼はあの課題をやるつもりだ。", en: "He is going to try that problem." },
+      { ja: "私は新しいシューズを買うつもりだ。", en: "I am going to buy new shoes." },
+      { ja: "雨が降りそうだ。", en: "It is going to rain." },
+      { ja: "私たちは5時に帰る予定だ。", en: "We are going to leave at five." },
+      { ja: "落ちそうだ！", en: "I am going to fall!" }
+    ]},
+    { id: "c1-there", ch: 1, name: "there is / are", items: [
+      { ja: "壁に新しい課題がある。", en: "There is a new problem on the wall." },
+      { ja: "今日はジムに人がたくさんいる。", en: "There are a lot of people at the gym today." },
+      { ja: "そこに小さい足がある。", en: "There is a small foothold there." },
+      { ja: "このジムにはマットが3枚ある。", en: "There are three mats in this gym." },
+      { ja: "ここには良いホールドがない。", en: "There is no good hold here." },
+      { ja: "近くに良い岩場はありますか。", en: "Is there a good crag near here?" }
+    ]},
+    { id: "c1-will-shall", ch: 1, name: "will（依頼）/ shall（申し出）", items: [
+      { ja: "マットを動かしてくれる？", en: "Will you move the crash pad?" },
+      { ja: "写真を撮ってくれませんか。", en: "Will you take a picture of me?" },
+      { ja: "スポットしましょうか。", en: "Shall I spot you?" },
+      { ja: "休憩しましょうか。", en: "Shall we take a break?" },
+      { ja: "ベータを教えてくれる？", en: "Will you show me the beta?" },
+      { ja: "荷物を持ちましょうか。", en: "Shall I carry your bag?" }
+    ]},
+    { id: "c1-can", ch: 1, name: "can / be able to", items: [
+      { ja: "私はこの課題を登れる。", en: "I can climb this problem." },
+      { ja: "私は片手では持てない。", en: "I cannot hold it with one hand.", alt: ["I can't hold it with one hand."] },
+      { ja: "彼はV5を登ることができる。", en: "He is able to climb V5." },
+      { ja: "あのホールドに届く？", en: "Can you reach that hold?" },
+      { ja: "昨日はトップを取れなかった。", en: "I was not able to get the top yesterday." },
+      { ja: "手伝ってくれますか。", en: "Can you help me?" }
+    ]},
+    { id: "c1-must-may", ch: 1, name: "must / may", items: [
+      { ja: "君はもっと足を使わなければならない。", en: "You must use your feet more." },
+      { ja: "ここで靴を脱がなければならない。", en: "You must take off your shoes here." },
+      { ja: "あの課題は難しいかもしれない。", en: "That problem may be hard." },
+      { ja: "明日は雨が降るかもしれない。", en: "It may rain tomorrow." },
+      { ja: "このマットを使ってもいいですか。", en: "May I use this mat?" },
+      { ja: "彼は疲れているに違いない。", en: "He must be tired." }
+    ]},
+    { id: "c1-need-have", ch: 1, name: "need / have to", items: [
+      { ja: "私は休む必要がある。", en: "I need to take a break." },
+      { ja: "私はもっと練習しなければならない。", en: "I have to practice more." },
+      { ja: "君は急ぐ必要はない。", en: "You don't have to hurry." },
+      { ja: "新しいシューズが必要だ。", en: "I need new shoes." },
+      { ja: "私は6時に帰らなければならない。", en: "I have to leave at six." },
+      { ja: "テープは必要ですか。", en: "Do you need any tape?" }
+    ]},
+    { id: "c1-should", ch: 1, name: "should / had better", items: [
+      { ja: "君はもっと休むべきだ。", en: "You should rest more." },
+      { ja: "足をよく見るべきだ。", en: "You should look at your feet." },
+      { ja: "今日はもうやめたほうがいい。", en: "You had better stop for today." },
+      { ja: "指をテープで守ったほうがいい。", en: "You had better tape your fingers." },
+      { ja: "私たちは早く行くべきだ。", en: "We should go early." },
+      { ja: "無理しないほうがいいよ。", en: "You had better not push too hard." }
+    ]},
+
+    /* ===== Chapter 2 ===== */
+    { id: "c2-passive", ch: 2, name: "受動態", items: [
+      { ja: "この課題は先週作られた。", en: "This problem was set last week." },
+      { ja: "そのホールドは壊れている。", en: "That hold is broken." },
+      { ja: "ジムは9時に閉められる。", en: "The gym is closed at nine." },
+      { ja: "新しい課題が毎月作られる。", en: "New problems are set every month." },
+      { ja: "彼はみんなに尊敬されている。", en: "He is respected by everyone." },
+      { ja: "このマットは去年替えられた。", en: "This mat was changed last year." }
+    ]},
+    { id: "c2-adv-wh", ch: 2, name: "副詞の疑問詞（when / where / why / how）", items: [
+      { ja: "いつジムに行くの？", en: "When do you go to the gym?" },
+      { ja: "どこで登るの？", en: "Where do you climb?" },
+      { ja: "なぜ落ちたの？", en: "Why did you fall?" },
+      { ja: "どうやってこの動きをするの？", en: "How do you do this move?" },
+      { ja: "どのくらいの頻度でここに来るの？", en: "How often do you come here?" },
+      { ja: "なぜこの課題が好きなの？", en: "Why do you like this problem?" }
+    ]},
+    { id: "c2-wh", ch: 2, name: "WH疑問文（what / who / which / whose）", items: [
+      { ja: "グレードはいくつですか。", en: "What grade is it?" },
+      { ja: "誰がこの課題を作ったの？", en: "Who set this problem?" },
+      { ja: "どっちの課題をやる？", en: "Which problem will you try?" },
+      { ja: "これは誰のチョークバッグ？", en: "Whose chalk bag is this?" },
+      { ja: "次は何をするの？", en: "What will you do next?" },
+      { ja: "誰が一番強いの？", en: "Who is the strongest?" }
+    ]},
+    { id: "c2-excl", ch: 2, name: "感嘆文", items: [
+      { ja: "なんて高い壁なんだ！", en: "What a high wall!" },
+      { ja: "なんてすごい登りなんだ！", en: "What a great climb!" },
+      { ja: "なんて難しいんだ！", en: "How hard it is!" },
+      { ja: "なんて小さいホールドなんだ！", en: "What a small hold!" },
+      { ja: "彼はなんて強いクライマーなんだ！", en: "What a strong climber he is!" },
+      { ja: "この岩はなんてきれいなんだ！", en: "How beautiful this rock is!" }
+    ]},
+    { id: "c2-indirect", ch: 2, name: "間接疑問文", items: [
+      { ja: "彼がどこにいるか知ってる？", en: "Do you know where he is?" },
+      { ja: "なぜ落ちたのか分からない。", en: "I don't know why I fell." },
+      { ja: "彼がどうやって登ったか教えて。", en: "Tell me how he climbed it." },
+      { ja: "誰がこの課題を作ったか知ってる？", en: "Do you know who set this problem?" },
+      { ja: "次に何をすればいいか分からない。", en: "I don't know what I should do next." },
+      { ja: "ジムが何時に閉まるか知ってる？", en: "Do you know what time the gym closes?" }
+    ]},
+    { id: "c2-inf-n", ch: 2, name: "不定詞 名詞的用法", items: [
+      { ja: "登ることは楽しい。", en: "To climb is fun." },
+      { ja: "私は外で登りたい。", en: "I want to climb outside." },
+      { ja: "私の目標はV5を登ることだ。", en: "My goal is to climb V5." },
+      { ja: "私は休むことにした。", en: "I decided to take a break." },
+      { ja: "彼はトップを取ろうとした。", en: "He tried to get the top." },
+      { ja: "私はもっと強くなりたい。", en: "I want to get stronger." }
+    ]},
+    { id: "c2-inf-adv", ch: 2, name: "不定詞 副詞的用法", items: [
+      { ja: "私は登るためにジムに来た。", en: "I came to the gym to climb." },
+      { ja: "それを聞いてうれしい。", en: "I am happy to hear that." },
+      { ja: "彼はトップを取って喜んだ。", en: "He was glad to get the top." },
+      { ja: "私は休むために座った。", en: "I sat down to rest." },
+      { ja: "私は手を乾かすためにチョークを使う。", en: "I use chalk to dry my hands." },
+      { ja: "この課題は見ていて楽しい。", en: "This problem is fun to watch." }
+    ]},
+    { id: "c2-inf-adj", ch: 2, name: "不定詞 形容詞的用法", items: [
+      { ja: "何か飲むものはある？", en: "Do you have anything to drink?" },
+      { ja: "やるべき課題がたくさんある。", en: "I have a lot of problems to try." },
+      { ja: "休む時間がない。", en: "I have no time to rest." },
+      { ja: "持てるホールドがない。", en: "There is no hold to grab." },
+      { ja: "何か食べるものを持ってきた。", en: "I brought something to eat." },
+      { ja: "話す相手がほしい。", en: "I want someone to talk to." }
+    ]},
+    { id: "c2-formal-it", ch: 2, name: "形式主語の it", items: [
+      { ja: "この課題を登るのは難しい。", en: "It is hard to climb this problem." },
+      { ja: "毎日練習することは大切だ。", en: "It is important to practice every day." },
+      { ja: "足を使うのは簡単ではない。", en: "It is not easy to use your feet." },
+      { ja: "ここで休むのは気持ちがいい。", en: "It is nice to rest here." },
+      { ja: "一人で外岩に行くのは危ない。", en: "It is dangerous to climb outside alone." },
+      { ja: "彼に会えてうれしい。", en: "It is good to see him." }
+    ]},
+    { id: "c2-wh-to", ch: 2, name: "疑問詞 + to", items: [
+      { ja: "このホールドをどう持つか分からない。", en: "I don't know how to hold this." },
+      { ja: "次にどこに足を置けばいいか教えて。", en: "Tell me where to put my foot next." },
+      { ja: "何をすればいいか分からない。", en: "I don't know what to do." },
+      { ja: "いつ手を離せばいいか分からない。", en: "I don't know when to let go." },
+      { ja: "どっちの課題をやるか決められない。", en: "I can't decide which problem to try." },
+      { ja: "彼はどう登ればいいか知っている。", en: "He knows how to climb it." }
+    ]},
+    { id: "c2-svo-inf", ch: 2, name: "SVO + to不定詞", items: [
+      { ja: "彼は私に足を使うように言った。", en: "He told me to use my feet." },
+      { ja: "私は彼女にスポットを頼んだ。", en: "I asked her to spot me." },
+      { ja: "コーチは私にもう一回やってほしかった。", en: "My coach wanted me to try again." },
+      { ja: "彼は私に休むように言った。", en: "He told me to take a break." },
+      { ja: "私は友達に写真を撮ってくれるよう頼んだ。", en: "I asked my friend to take a picture." },
+      { ja: "母は私に気をつけてほしいと思っている。", en: "My mother wants me to be careful." }
+    ]},
+    { id: "c2-gerund", ch: 2, name: "動名詞", items: [
+      { ja: "登ることは楽しい。", en: "Climbing is fun." },
+      { ja: "私は外で登るのが好きだ。", en: "I like climbing outside." },
+      { ja: "彼は落ちるのを怖がっている。", en: "He is afraid of falling." },
+      { ja: "私は休まずに登り続けた。", en: "I kept climbing without resting." },
+      { ja: "私の趣味はボルダリングだ。", en: "My hobby is bouldering." },
+      { ja: "ストレッチをすることは大事だ。", en: "Stretching is important." }
+    ]},
+    { id: "c2-inf-ger", ch: 2, name: "不定詞と動名詞", items: [
+      { ja: "私は登り始めた。", en: "I started climbing.", alt: ["I started to climb."] },
+      { ja: "私はもう一度やってみることにした。", en: "I decided to try again." },
+      { ja: "私はテープを持ってくるのを忘れた。", en: "I forgot to bring tape." },
+      { ja: "彼はやめたがらなかった。", en: "He didn't want to stop." },
+      { ja: "私はその課題をやったのを覚えている。", en: "I remember trying that problem." },
+      { ja: "私は練習するのを楽しんでいる。", en: "I enjoy practicing." }
+    ]},
+    { id: "c2-pres-part", ch: 2, name: "現在分詞の修飾", items: [
+      { ja: "あそこで登っている人は私の友達だ。", en: "The man climbing over there is my friend." },
+      { ja: "マットで休んでいる人はコーチだ。", en: "The person resting on the mat is the coach." },
+      { ja: "順番を待っている人がたくさんいる。", en: "There are a lot of people waiting for their turn." },
+      { ja: "落ちてくるクライマーに気をつけて。", en: "Watch out for the falling climber." },
+      { ja: "大きな声で応援している人はコーチだ。", en: "The man cheering loudly is the coach." },
+      { ja: "回っているホールドは持ちにくい。", en: "The spinning hold is hard to hold." }
+    ]},
+    { id: "c2-past-part", ch: 2, name: "過去分詞の修飾", items: [
+      { ja: "壊れたホールドは使わないで。", en: "Don't use the broken hold." },
+      { ja: "これは先週作られた課題だ。", en: "This is the problem set last week." },
+      { ja: "これは日本で作られたシューズだ。", en: "These are shoes made in Japan." },
+      { ja: "彼が撮った写真を見せて。", en: "Show me the picture taken by him." },
+      { ja: "テープを巻いた指がまだ痛い。", en: "My taped finger still hurts." },
+      { ja: "使われていないマットを動かそう。", en: "Let's move the unused mat." }
+    ]},
+    { id: "c2-as-as", ch: 2, name: "原級比較（as ~ as）", items: [
+      { ja: "私は彼と同じくらい強い。", en: "I am as strong as he is.", alt: ["I am as strong as him."] },
+      { ja: "この課題はあれと同じくらい難しい。", en: "This problem is as hard as that one." },
+      { ja: "私は彼ほど速く登れない。", en: "I cannot climb as fast as he can." },
+      { ja: "この壁はあの壁と同じくらい高い。", en: "This wall is as high as that one." },
+      { ja: "できるだけゆっくり登って。", en: "Climb as slowly as you can." },
+      { ja: "私は君ほど背が高くない。", en: "I am not as tall as you." }
+    ]},
+    { id: "c2-er", ch: 2, name: "比較級 -er形", items: [
+      { ja: "この課題はあれより簡単だ。", en: "This problem is easier than that one." },
+      { ja: "彼は私より強い。", en: "He is stronger than me.", alt: ["He is stronger than I am."] },
+      { ja: "この壁はあの壁より高い。", en: "This wall is higher than that one." },
+      { ja: "右の課題のほうが長い。", en: "The problem on the right is longer." },
+      { ja: "今日は昨日より寒い。", en: "It is colder today than yesterday." },
+      { ja: "このホールドはあれより小さい。", en: "This hold is smaller than that one." }
+    ]},
+    { id: "c2-est", ch: 2, name: "最上級 -est形", items: [
+      { ja: "これはジムで一番難しい課題だ。", en: "This is the hardest problem in the gym." },
+      { ja: "彼はチームで一番強い。", en: "He is the strongest on the team." },
+      { ja: "これが一番高い壁だ。", en: "This is the highest wall." },
+      { ja: "それが一番小さいホールドだ。", en: "That is the smallest hold." },
+      { ja: "今日は今年で一番暑い日だ。", en: "Today is the hottest day of the year." },
+      { ja: "これは一番簡単な課題だ。", en: "This is the easiest problem." }
+    ]},
+    { id: "c2-more", ch: 2, name: "比較級 more形", items: [
+      { ja: "この課題はあれより面白い。", en: "This problem is more interesting than that one." },
+      { ja: "外岩のほうが難しい。", en: "Outdoor climbing is more difficult." },
+      { ja: "彼は私より慎重だ。", en: "He is more careful than me." },
+      { ja: "この動きのほうが大事だ。", en: "This move is more important." },
+      { ja: "足を使うほうが効率的だ。", en: "Using your feet is more efficient." },
+      { ja: "この課題はあれより危ない。", en: "This problem is more dangerous than that one." }
+    ]},
+    { id: "c2-most", ch: 2, name: "最上級 most形", items: [
+      { ja: "これは一番面白い課題だ。", en: "This is the most interesting problem." },
+      { ja: "彼はジムで一番慎重なクライマーだ。", en: "He is the most careful climber in the gym." },
+      { ja: "この動きが一番難しい。", en: "This move is the most difficult." },
+      { ja: "足の使い方が一番大事だ。", en: "Footwork is the most important thing." },
+      { ja: "これが一番人気のある課題だ。", en: "This is the most popular problem." },
+      { ja: "それが一番危ない課題だ。", en: "That is the most dangerous problem." }
+    ]},
+    { id: "c2-adv-er", ch: 2, name: "副詞の比較級", items: [
       { ja: "彼は私より速く登る。", en: "He climbs faster than me." },
-      { ja: "一番簡単なルートから始めよう。", en: "Let's start with the easiest route." }
+      { ja: "もっとゆっくり登って。", en: "Climb more slowly." },
+      { ja: "私は前より上手に登れる。", en: "I can climb better than before." },
+      { ja: "彼女は私より高く足を上げる。", en: "She puts her foot higher than me." },
+      { ja: "もっと注意深く足を見て。", en: "Look at your feet more carefully." },
+      { ja: "今日は昨日より長く登った。", en: "I climbed longer today than yesterday." }
     ]},
-    { id: "perfect", name: "現在完了", items: [
-      { ja: "私はこの課題をもう完登した。", en: "I have already finished this problem.", alt: ["I've already finished this problem."] },
-      { ja: "彼女はまだトップを取っていない。", en: "She hasn't got the top yet." },
-      { ja: "私は3年間クライミングをしている。", en: "I have climbed for three years.", alt: ["I've climbed for three years.", "I have been climbing for three years."] },
-      { ja: "私はこの課題に10回挑戦した。", en: "I have tried this problem ten times." },
-      { ja: "私は一度も落ちたことがない。", en: "I have never fallen.", alt: ["I've never fallen."] },
-      { ja: "もうこの新しいジムに行った？", en: "Have you been to this new gym yet?" },
-      { ja: "私はずっと指を痛めている。", en: "I have hurt my finger." },
-      { ja: "私たちは長い間友達だ。", en: "We have been friends for a long time." }
+    { id: "c2-adv-est", ch: 2, name: "副詞の最上級", items: [
+      { ja: "彼がチームで一番速く登る。", en: "He climbs the fastest on the team." },
+      { ja: "彼女が一番上手に登る。", en: "She climbs the best." },
+      { ja: "私が一番長く登った。", en: "I climbed the longest." },
+      { ja: "彼が一番高く跳ぶ。", en: "He jumps the highest." },
+      { ja: "彼女が一番注意深く登る。", en: "She climbs the most carefully." },
+      { ja: "私が一番早くジムに来た。", en: "I came to the gym the earliest." }
     ]},
-    { id: "conj", name: "接続詞（because / when / if / that）", items: [
-      { ja: "疲れていたので、私は落ちた。", en: "I fell because I was tired." },
-      { ja: "トップに着いたとき、私は嬉しかった。", en: "I was happy when I reached the top." },
-      { ja: "もし雨が降ったら、私たちはジムで登る。", en: "If it rains, we will climb at the gym.", alt: ["If it rains, we'll climb at the gym."] },
-      { ja: "私はこの課題が難しいと思う。", en: "I think that this problem is hard.", alt: ["I think this problem is hard."] },
-      { ja: "彼は強いけど、よく落ちる。", en: "He is strong, but he falls a lot." },
+    { id: "c2-cmp-q", ch: 2, name: "比較級・最上級を使った疑問文", items: [
+      { ja: "どっちの課題のほうが難しい？", en: "Which problem is harder?" },
+      { ja: "誰が一番強いの？", en: "Who is the strongest?" },
+      { ja: "どの課題が一番好き？", en: "Which problem do you like the best?" },
+      { ja: "外岩とジム、どっちが好き？", en: "Which do you like better, outdoor or the gym?" },
+      { ja: "ジムで一番難しい課題はどれ？", en: "What is the hardest problem in the gym?" },
+      { ja: "君は私より強い？", en: "Are you stronger than me?" }
+    ]},
+
+    /* ===== Chapter 3 ===== */
+    { id: "c3-that", ch: 3, name: "名詞節を導く that", items: [
+      { ja: "私はこの課題が登れると思う。", en: "I think that I can climb this problem." },
+      { ja: "彼は疲れていると言った。", en: "He said that he was tired." },
+      { ja: "君が強いのは知っている。", en: "I know that you are strong." },
+      { ja: "彼女がトップを取ってうれしい。", en: "I am glad that she got the top." },
+      { ja: "明日は雨だと思う。", en: "I think that it will rain tomorrow." },
+      { ja: "この課題は簡単だと彼は言った。", en: "He said that this problem was easy." }
+    ]},
+    { id: "c3-conj", ch: 3, name: "副詞節を作る接続詞", items: [
+      { ja: "疲れたときは休んで。", en: "Rest when you are tired." },
       { ja: "足を使えば、もっと楽に登れる。", en: "If you use your feet, you can climb more easily." },
+      { ja: "指が痛いので今日はやめる。", en: "I will stop today because my fingers hurt." },
+      { ja: "私は登る前にストレッチをする。", en: "I stretch before I climb." },
       { ja: "私は登り終わってから水を飲んだ。", en: "I drank water after I finished climbing." },
-      { ja: "怖かったけど、私は手を離した。", en: "I was scared, but I let go." }
+      { ja: "彼は強いけど、よく落ちる。", en: "Although he is strong, he falls a lot." }
+    ]},
+    { id: "c3-subj", ch: 3, name: "仮定法過去", items: [
+      { ja: "もっと背が高かったら、あのホールドに届くのに。", en: "If I were taller, I could reach that hold." },
+      { ja: "指が痛くなければ、もう一回やるのに。", en: "If my fingers didn't hurt, I would try again." },
+      { ja: "時間があれば、外岩に行くのに。", en: "If I had time, I would go outside." },
+      { ja: "彼みたいに強かったらなあ。", en: "I wish I were as strong as him." },
+      { ja: "雨が降っていなければ、岩場に行けるのに。", en: "If it were not raining, we could go to the crag." },
+      { ja: "もっと練習していればなあ。", en: "I wish I practiced more." }
+    ]},
+    { id: "c3-perception", ch: 3, name: "知覚動詞", items: [
+      { ja: "彼が落ちるのを見た。", en: "I saw him fall." },
+      { ja: "誰かが叫ぶのが聞こえた。", en: "I heard someone shout." },
+      { ja: "ホールドが回るのを感じた。", en: "I felt the hold spin." },
+      { ja: "彼女が登っているのを見た。", en: "I saw her climbing." },
+      { ja: "彼が私の名前を呼ぶのが聞こえた。", en: "I heard him call my name." },
+      { ja: "手が滑るのを感じた。", en: "I felt my hand slipping." }
+    ]},
+    { id: "c3-causative", ch: 3, name: "使役動詞", items: [
+      { ja: "彼は私にもう一回やらせた。", en: "He made me try again." },
+      { ja: "コーチは私を休ませてくれた。", en: "The coach let me rest." },
+      { ja: "私は友達にマットを動かしてもらった。", en: "I had my friend move the crash pad." },
+      { ja: "私にやらせて。", en: "Let me try." },
+      { ja: "その課題は私を強くした。", en: "That problem made me stronger." },
+      { ja: "私は彼にベータを見せてもらった。", en: "I had him show me the beta." }
+    ]},
+    { id: "c3-rel-s-p", ch: 3, name: "関係代名詞 主格（人）", items: [
+      { ja: "あそこで登っている人は私の友達だ。", en: "The man who is climbing over there is my friend." },
+      { ja: "この課題を作った人はうまい。", en: "The person who set this problem is good." },
+      { ja: "毎日来る人がいる。", en: "There is a man who comes every day." },
+      { ja: "私は助けてくれた人にお礼を言った。", en: "I thanked the person who helped me." },
+      { ja: "私にはV8を登る友達がいる。", en: "I have a friend who climbs V8." },
+      { ja: "スポットしてくれた人は誰？", en: "Who is the person who spotted me?" }
+    ]},
+    { id: "c3-rel-s-t", ch: 3, name: "関係代名詞 主格（人以外）", items: [
+      { ja: "これが私を落とした課題だ。", en: "This is the problem which made me fall." },
+      { ja: "先週できた課題はもうない。", en: "The problem which was set last week is gone." },
+      { ja: "回るホールドは危ない。", en: "A hold which spins is dangerous." },
+      { ja: "高い壁にある課題は怖い。", en: "The problems which are on the high wall are scary." },
+      { ja: "私は駅の近くにあるジムに行く。", en: "I go to a gym which is near the station." },
+      { ja: "一番上にあるホールドが遠い。", en: "The hold which is at the top is far." }
+    ]},
+    { id: "c3-rel-o-p", ch: 3, name: "関係代名詞 目的格（人）", items: [
+      { ja: "昨日会った人はとても強かった。", en: "The man whom I met yesterday was very strong.", alt: ["The man I met yesterday was very strong."] },
+      { ja: "私が尊敬するクライマーはここに来る。", en: "The climber whom I respect comes here." },
+      { ja: "私が助けた人は初心者だった。", en: "The person whom I helped was a beginner." },
+      { ja: "君が話していた人は誰？", en: "Who is the person you were talking to?" },
+      { ja: "私が一緒に登る友達は強い。", en: "The friend whom I climb with is strong." },
+      { ja: "彼が教えた生徒はみんなうまくなった。", en: "The students whom he taught all got better." }
+    ]},
+    { id: "c3-rel-o-t", ch: 3, name: "関係代名詞 目的格（人以外）", items: [
+      { ja: "私が昨日やった課題は難しかった。", en: "The problem which I tried yesterday was hard." },
+      { ja: "私が買ったシューズは小さすぎた。", en: "The shoes which I bought were too small." },
+      { ja: "君が言っていた課題はどれ？", en: "Which is the problem that you talked about?" },
+      { ja: "これが私の一番好きな課題だ。", en: "This is the problem which I like the best." },
+      { ja: "彼が作った課題は面白い。", en: "The problem which he set is interesting." },
+      { ja: "あれが私が届かなかったホールドだ。", en: "That is the hold which I could not reach." }
+    ]},
+    { id: "c3-rel-what", ch: 3, name: "関係代名詞（先行詞を含む what）", items: [
+      { ja: "君が言ったことは正しい。", en: "What you said is right." },
+      { ja: "私が欲しいのは新しいシューズだ。", en: "What I want is new shoes." },
+      { ja: "彼がやったことを見た？", en: "Did you see what he did?" },
+      { ja: "私に必要なのは休みだ。", en: "What I need is a rest." },
+      { ja: "それが私の言いたいことだ。", en: "That is what I want to say." },
+      { ja: "君がやるべきことは足を使うことだ。", en: "What you should do is use your feet." }
+    ]},
+    { id: "c3-rel-adv", ch: 3, name: "関係副詞 where / when", items: [
+      { ja: "ここが私がいつも登るジムだ。", en: "This is the gym where I always climb." },
+      { ja: "私は落ちた場所を覚えている。", en: "I remember the place where I fell." },
+      { ja: "私は初めて登った日を覚えている。", en: "I remember the day when I first climbed." },
+      { ja: "彼に会った岩場に行こう。", en: "Let's go to the crag where I met him." },
+      { ja: "雨が降った日は登れなかった。", en: "We could not climb on the day when it rained." },
+      { ja: "ここが新しい課題ができた壁だ。", en: "This is the wall where the new problem was set." }
+    ]},
+    { id: "c3-whose", ch: 3, name: "関係代名詞 whose", items: [
+      { ja: "シューズが赤い人は私の友達だ。", en: "The man whose shoes are red is my friend." },
+      { ja: "私には指を怪我した友達がいる。", en: "I have a friend whose finger is hurt." },
+      { ja: "私は名前を忘れた人に会った。", en: "I met a person whose name I forgot." },
+      { ja: "あれがホールドの壊れた課題だ。", en: "That is the problem whose hold is broken." },
+      { ja: "お父さんがクライマーの子がいる。", en: "There is a boy whose father is a climber." },
+      { ja: "チョークバッグが青い人は誰？", en: "Who is the person whose chalk bag is blue?" }
+    ]},
+    { id: "c3-pf-cont", ch: 3, name: "現在完了形（継続）", items: [
+      { ja: "私は3年間クライミングをしている。", en: "I have climbed for three years." },
+      { ja: "彼は朝からここにいる。", en: "He has been here since this morning." },
+      { ja: "私は長い間この課題をやっている。", en: "I have been working on this problem for a long time." },
+      { ja: "どのくらいクライミングをしているの？", en: "How long have you climbed?" },
+      { ja: "私たちは10年来の友達だ。", en: "We have been friends for ten years." },
+      { ja: "しばらくずっと指が痛い。", en: "My finger has hurt for a while." }
+    ]},
+    { id: "c3-pf-comp", ch: 3, name: "現在完了形（完了）", items: [
+      { ja: "私はもうトップを取った。", en: "I have already got the top." },
+      { ja: "私はまだこの課題を登っていない。", en: "I have not climbed this problem yet." },
+      { ja: "もう休憩した？", en: "Have you taken a break yet?" },
+      { ja: "私はちょうど登り終わったところだ。", en: "I have just finished climbing." },
+      { ja: "彼はもう帰ってしまった。", en: "He has already gone home." },
+      { ja: "新しい課題はもう作られた。", en: "The new problem has already been set." }
+    ]},
+    { id: "c3-pf-exp", ch: 3, name: "現在完了形（経験）", items: [
+      { ja: "私は外岩で登ったことがある。", en: "I have climbed outside before." },
+      { ja: "この課題をやったことがある？", en: "Have you ever tried this problem?" },
+      { ja: "私は一度も怪我をしたことがない。", en: "I have never been hurt." },
+      { ja: "私は彼に何回か会ったことがある。", en: "I have met him a few times." },
+      { ja: "私はV5を登ったことがない。", en: "I have never climbed V5." },
+      { ja: "そのジムに行ったことある？", en: "Have you ever been to that gym?" }
+    ]},
+    { id: "c3-past-pf", ch: 3, name: "過去完了形", items: [
+      { ja: "私が着いたとき、彼はもう帰っていた。", en: "When I arrived, he had already gone home." },
+      { ja: "私はその課題を前にやったことがあった。", en: "I had tried that problem before." },
+      { ja: "彼はそのとき3年間登っていた。", en: "He had climbed for three years then." },
+      { ja: "私が行く前に、雨が降っていた。", en: "It had rained before I went." },
+      { ja: "彼女はもうトップを取っていた。", en: "She had already got the top." },
+      { ja: "私はシューズを忘れたことに気づいた。", en: "I found that I had forgotten my shoes." }
+    ]},
+    { id: "c3-fut-pf", ch: 3, name: "過去完了形 / 未来完了形", items: [
+      { ja: "来月で私は3年登ったことになる。", en: "Next month I will have climbed for three years." },
+      { ja: "5時までには登り終わっているだろう。", en: "I will have finished climbing by five." },
+      { ja: "もう一回行けば、10回目になる。", en: "If I go one more time, I will have been there ten times." },
+      { ja: "私が着くころには、彼は帰っているだろう。", en: "He will have gone home by the time I arrive." },
+      { ja: "彼はそのときもうトップを取っていた。", en: "He had already got the top then." },
+      { ja: "来週までには新しい課題ができているだろう。", en: "The new problems will have been set by next week." }
+    ]},
+    { id: "c3-enough", ch: 3, name: "enough / too / so that", items: [
+      { ja: "私はあのホールドに届くほど背が高くない。", en: "I am not tall enough to reach that hold." },
+      { ja: "この課題は私には難しすぎる。", en: "This problem is too hard for me." },
+      { ja: "彼はとても強いので簡単に登れる。", en: "He is so strong that he can climb it easily." },
+      { ja: "私は疲れすぎて登れない。", en: "I am too tired to climb." },
+      { ja: "彼はトップを取れるほど強い。", en: "He is strong enough to get the top." },
+      { ja: "岩がとても滑るので登れなかった。", en: "The rock was so slippery that we could not climb." }
     ]}
   ];
 
@@ -894,7 +1265,7 @@
 
   function rebuildData() {
     CATS = BUILTIN.map(function (c) {
-      return { id: c.id, name: c.name, custom: false, items: c.items.map(function (it) {
+      return { id: c.id, ch: c.ch, name: c.name, custom: false, items: c.items.map(function (it) {
         return { ja: it.ja, en: it.en, alt: it.alt || [] };
       })};
     });
@@ -904,7 +1275,7 @@
       (groups[k] = groups[k] || []).push(it);
     });
     Object.keys(groups).forEach(function (name) {
-      CATS.push({ id: "cust:" + name, name: name, custom: true, items: groups[name].map(function (it) {
+      CATS.push({ id: "cust:" + name, ch: 9, name: name, custom: true, items: groups[name].map(function (it) {
         return { ja: it.ja, en: it.en, alt: it.alt || [], note: it.note || "" };
       })});
     });
@@ -918,7 +1289,23 @@
       });
     });
 
+    // 旧バージョンのカテゴリIDしか残っていない場合は全選択に戻す
     if (settings.cats == null) settings.cats = CATS.map(function (c) { return c.id; });
+    else {
+      var live = {};
+      CATS.forEach(function (c) { live[c.id] = 1; });
+      var kept = settings.cats.filter(function (id) { return live[id]; });
+      settings.cats = kept.length ? kept : CATS.map(function (c) { return c.id; });
+    }
+  }
+  function chapterName(ch) {
+    for (var i = 0; i < CHAPTERS.length; i++) if (CHAPTERS[i].ch === ch) return CHAPTERS[i].name;
+    return "マイ例文";
+  }
+  function chapterOrder() {
+    var seen = {}, out = [];
+    CATS.forEach(function (c) { if (!seen[c.ch]) { seen[c.ch] = 1; out.push(c.ch); } });
+    return out;
   }
 
   function todayKey() { return new Date().toLocaleDateString("sv-SE"); }
@@ -1151,20 +1538,49 @@
   function renderCatList() {
     var wrap = $("catList");
     wrap.innerHTML = "";
-    CATS.forEach(function (cat) {
-      var row = document.createElement("label");
-      row.className = "cat-row";
-      var checked = settings.cats.indexOf(cat.id) !== -1;
-      row.innerHTML =
-        '<input type="checkbox" ' + (checked ? "checked" : "") + '>' +
-        '<span class="cat-name">' + esc(cat.name) + (cat.custom ? '<span class="tag-own">自分</span>' : '') + '</span>' +
-        '<span class="cat-meta">' + catMeta(cat) + '</span>';
-      row.querySelector("input").addEventListener("change", function (e) {
-        if (e.target.checked) { if (settings.cats.indexOf(cat.id) === -1) settings.cats.push(cat.id); }
-        else settings.cats = settings.cats.filter(function (x) { return x !== cat.id; });
-        saveSettings(); updateStartBtn(); updateToggleAllLabel();
+    chapterOrder().forEach(function (ch) {
+      var cats = CATS.filter(function (c) { return c.ch === ch; });
+      var on = cats.filter(function (c) { return settings.cats.indexOf(c.id) !== -1; }).length;
+
+      var head = document.createElement("div");
+      head.className = "ch-head";
+      head.innerHTML =
+        '<span class="ch-title">' + esc(chapterName(ch)) + '</span>' +
+        '<span class="ch-count">' + on + ' / ' + cats.length + '</span>' +
+        '<button class="link-btn ch-toggle" type="button">' + (on >= cats.length ? "解除" : "選択") + '</button>';
+      head.querySelector(".ch-toggle").addEventListener("click", function () {
+        var ids = cats.map(function (c) { return c.id; });
+        var now = ids.filter(function (id) { return settings.cats.indexOf(id) !== -1; }).length;
+        if (now >= ids.length) {
+          settings.cats = settings.cats.filter(function (x) { return ids.indexOf(x) === -1; });
+        } else {
+          ids.forEach(function (id) { if (settings.cats.indexOf(id) === -1) settings.cats.push(id); });
+        }
+        saveSettings(); renderCatList(); updateStartBtn();
       });
-      wrap.appendChild(row);
+      wrap.appendChild(head);
+
+      cats.forEach(function (cat) {
+        var row = document.createElement("label");
+        row.className = "cat-row";
+        var checked = settings.cats.indexOf(cat.id) !== -1;
+        row.innerHTML =
+          '<input type="checkbox" ' + (checked ? "checked" : "") + '>' +
+          '<span class="cat-name">' + esc(cat.name) + (cat.custom ? '<span class="tag-own">自分</span>' : '') + '</span>' +
+          '<span class="cat-meta">' + catMeta(cat) + '</span>';
+        row.querySelector("input").addEventListener("change", function (e) {
+          if (e.target.checked) { if (settings.cats.indexOf(cat.id) === -1) settings.cats.push(cat.id); }
+          else settings.cats = settings.cats.filter(function (x) { return x !== cat.id; });
+          saveSettings(); updateStartBtn(); updateToggleAllLabel();
+          var h = wrap.querySelectorAll(".ch-head")[chapterOrder().indexOf(cat.ch)];
+          if (h) {
+            var n = cats.filter(function (c) { return settings.cats.indexOf(c.id) !== -1; }).length;
+            h.querySelector(".ch-count").textContent = n + " / " + cats.length;
+            h.querySelector(".ch-toggle").textContent = n >= cats.length ? "解除" : "選択";
+          }
+        });
+        wrap.appendChild(row);
+      });
     });
     updateToggleAllLabel();
   }
@@ -1772,7 +2188,15 @@
   function renderBook() {
     var wrap = $("bookList");
     wrap.innerHTML = "";
+    var lastCh = null;
     CATS.forEach(function (cat) {
+      if (cat.ch !== lastCh) {
+        lastCh = cat.ch;
+        var ch = document.createElement("div");
+        ch.className = "ch-head ch-head-book";
+        ch.innerHTML = '<span class="ch-title">' + esc(chapterName(cat.ch)) + '</span>';
+        wrap.appendChild(ch);
+      }
       var block = document.createElement("div");
       block.className = "card book-cat";
       block.innerHTML = "<h3>" + esc(cat.name) + (cat.custom ? " （自分）" : "") + "</h3>";
